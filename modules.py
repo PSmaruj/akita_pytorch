@@ -283,27 +283,45 @@ class OneToTwo(nn.Module):
         return twod
 
 
+class ConcatDist2D(nn.Module):
+    '''Concatenate the pairwise distance to 2D feature matrix.'''
+
+    def __init__(self):
+        super(ConcatDist2D, self).__init__()
+
+    def forward(self, inputs):
+        # Assume inputs is of shape [batch_size, features, seq_len, seq_len]
+        batch_size, features, seq_len, seq_len_ = inputs.shape
+
+        # Check input consistency
+        assert seq_len == seq_len_, "Input dimensions must be square (seq_len, seq_len)."
+
+        # Create pairwise distance matrix
+        pos = torch.arange(seq_len, device=inputs.device).unsqueeze(0).repeat(seq_len, 1)  # [seq_len, seq_len]
+        matrix_repr1 = pos
+        matrix_repr2 = pos.t()
+        dist = torch.abs(matrix_repr1 - matrix_repr2).float()  # [seq_len, seq_len]
+        dist = dist.unsqueeze(0).unsqueeze(0).repeat(batch_size, 1, 1, 1)  # [batch_size, 1, seq_len, seq_len]
+
+        # Concatenate along the feature axis
+        return torch.cat([inputs, dist], dim=1)
+
+
+class Conv2DBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3, bn_momentum=0.9265):
+        super(Conv2DBlock, self).__init__()
+        self.block = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2, bias=False),
+            nn.BatchNorm2d(out_channels, momentum=bn_momentum)
+        )
+    
+    def forward(self, x):
+        return self.block(x)
+    
+    
+
 ################################
-
-
-# class ConcatDist2D(nn.Module):
-#     ''' Concatenate the pairwise distance to 2d feature matrix.'''
-
-#     def __init__(self):
-#         super(ConcatDist2D, self).__init__()
-
-#     def forward(self, inputs):
-#         batch_size, seq_len, features = inputs.shape[0],inputs.shape[3],inputs.shape[1]
-
-#         ## concat 2D distance ##
-#         pos = torch.arange(seq_len).unsqueeze(0).repeat(seq_len, 1)
-#         matrix_repr1 = pos
-#         matrix_repr2 = pos.t()
-#         dist = torch.abs(matrix_repr1 - matrix_repr2)
-#         dist = dist.float().unsqueeze(0).unsqueeze(-1).repeat(batch_size, 1, 1, 1)
-#         dist = torch.transpose(dist, 1, -1)
-
-#         return torch.cat([inputs, dist.cuda()], dim=1)
 
 
 # class Symmetrize2D(nn.Module):

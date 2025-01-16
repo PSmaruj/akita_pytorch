@@ -15,7 +15,9 @@ from modules import (StochasticReverseComplement,
                      ConvTower,
                      ResidualDilatedBlock1D, 
                      ConvBlockReduce, 
-                     OneToTwo)
+                     OneToTwo,
+                     ConcatDist2D,
+                     Conv2DBlock)
 
 
 class SeqNN(nn.Module):
@@ -120,8 +122,18 @@ class SeqNN(nn.Module):
         )
         
         # HEAD
+        
+        # 1D to 2D
         self.one_to_two = OneToTwo()
         
+        # Concatenating distance
+        self.concat_dist = ConcatDist2D()
+        
+        # ConvBlock
+        self.conv2d_block = Conv2DBlock(
+            in_channels=65, 
+            out_channels=48, 
+            kernel_size=3)
         
     def forward(self, x, training=False):
         device = x.device
@@ -158,79 +170,19 @@ class SeqNN(nn.Module):
         # Apply OneToTwo
         x = self.one_to_two(x)
         
+        # Apply ConcatDist2D
+        x = self.concat_dist(x)
+        
+        # Apply Conv2DBlock
+        x = self.conv2d_block(x)
+         
         print(f"End shape: {x.size()}")
         
         return x
 
 
-# from torchsummary import summary
 
-# class SeqNN(nn.Module):
-#     def __init__(self,n_channel=4,max_len=128):
-#         super(SeqNN, self).__init__()
-        
-#         self.stochastic_reverse_complement = StochasticReverseComplement()
-#         self.stochastic_shift = StochasticShift()
-#         self.re_lu = nn.ReLU()
-        
-#         # ConvBlock
-#         self.conv_block_1 = ConvBlock(
-#             filters=96,
-#             kernel_size=11,
-#             stride=1,
-#             dilation_rate=1,
-#             pool_size=2,
-#             pool_type='max',
-#             norm_type='batch',
-#             bn_momentum=0.9265
-#         )
-
-#         # ConvTower
-#         self.conv_tower = ConvTower(
-#             in_channels=96,
-#             filters_init=96,
-#             filters_mult=1.0,
-#             kernel_size=5,
-#             pool_size=2,
-#             repeat=10,
-#             norm_type="batch",
-#             bn_momentum=0.9265
-#         )
-        
-    #     # DilatedResidual1D
-    #     self.dilated_residual_block = DilatedResidual1D(
-    #         in_channels=96,  # Same input channels as the output from ConvTower
-    #         filters=48,      # Filters for dilated residual block
-    #         kernel_size=3,   # Kernel size for convolutions
-    #         rate_mult=1.75,  # Multiplier for dilation rate
-    #         repeat=8,        # Number of dilated residual layers
-    #         dropout=0.4,     # Dropout rate
-    #         norm_type='batch',  # Batch normalization
-    #     )
-        
-    # def forward(self,x, training=False):
-        
-    #     device = x.device
-    #     self.to(device)
-        
-    #     x = self.stochastic_reverse_complement(x, training=training)
-        
-    #     x = self.stochastic_shift(x)
-        
-    #     x = self.re_lu(x)
-        
-    #     x = self.conv_block_1(x)
-        
-    #     x = self.conv_tower(x)
-    #     print(f"After conv_tower: {x.size()}")
-
-    #     # Apply DilatedResidual1D block
-    #     x = self.dilated_residual_block(x)
-    #     print(f"After dilated_residual_block: {x.size()}")
-        
-    #     return x
-
-
+#################################
 
 # def from_upptri(inputs):
 #     seq_len = inputs.shape[2]
