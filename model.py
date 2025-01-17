@@ -17,7 +17,13 @@ from modules import (StochasticReverseComplement,
                      ConvBlockReduce, 
                      OneToTwo,
                      ConcatDist2D,
-                     Conv2DBlock)
+                     Conv2DBlock,
+                     Symmetrize2D,
+                     DilatedResidualBlock2D,
+                     Cropping2D,
+                     UpperTri,
+                     Final,
+                     SwitchReverseTriu)
 
 
 class SeqNN(nn.Module):
@@ -135,12 +141,69 @@ class SeqNN(nn.Module):
             out_channels=48, 
             kernel_size=3)
         
+        # Symmetrize2D
+        self.symmetrize_2d = Symmetrize2D()
+        
+        # ResidualDilatedBlock - 2D
+        self.residual2d_block1 = DilatedResidualBlock2D(
+            in_channels=48, 
+            mid_channels=24, 
+            kernel_size=3, 
+            dilation_rate=1,
+            dropout_prob=0.1)
+        
+        self.residual2d_block2 = DilatedResidualBlock2D(
+            in_channels=48, 
+            mid_channels=24, 
+            kernel_size=3, 
+            dilation_rate=2,
+            dropout_prob=0.1)
+        
+        self.residual2d_block3 = DilatedResidualBlock2D(
+            in_channels=48, 
+            mid_channels=24, 
+            kernel_size=3, 
+            dilation_rate=4,
+            dropout_prob=0.1)
+        
+        self.residual2d_block4 = DilatedResidualBlock2D(
+            in_channels=48, 
+            mid_channels=24, 
+            kernel_size=3, 
+            dilation_rate=7,
+            dropout_prob=0.1)
+        
+        self.residual2d_block5 = DilatedResidualBlock2D(
+            in_channels=48, 
+            mid_channels=24, 
+            kernel_size=3, 
+            dilation_rate=12,
+            dropout_prob=0.1)
+        
+        self.residual2d_block6 = DilatedResidualBlock2D(
+            in_channels=48, 
+            mid_channels=24, 
+            kernel_size=3, 
+            dilation_rate=21,
+            dropout_prob=0.1)
+        
+        # Cropping2D
+        self.cropping_2d = Cropping2D(cropping=32)
+        
+        # UpperTri
+        self.upper_tri = UpperTri()
+        
+        # Final
+        self.final = Final(units=2, activation='linear')
+        
+        self.switch_reverse_triu = SwitchReverseTriu(diagonal_offset=2, matrix_size=448)
+        
     def forward(self, x, training=False):
         device = x.device
         self.to(device)
 
         # Apply stochastic reverse complement
-        x = self.stochastic_reverse_complement(x, training=training)
+        x, reverse_bool = self.stochastic_reverse_complement(x, training=training)
 
         # Apply stochastic shift
         x = self.stochastic_shift(x)
@@ -154,7 +217,7 @@ class SeqNN(nn.Module):
         # Apply ConvTower
         x = self.conv_tower(x)
         
-        # Apply ResidualDilatedBlock
+        # Apply ResidualDilatedBlock - 1D
         x = self.residual1d_block1(x) 
         x = self.residual1d_block2(x) 
         x = self.residual1d_block3(x)
@@ -175,63 +238,29 @@ class SeqNN(nn.Module):
         
         # Apply Conv2DBlock
         x = self.conv2d_block(x)
-         
+
+        # Apply Symmetrize2D
+        x = self.symmetrize_2d(x)
+        
+        # Apply ResidualDilatedBlock - 2D
+        x = self.residual2d_block1(x)
+        x = self.residual2d_block2(x)
+        x = self.residual2d_block3(x)
+        x = self.residual2d_block4(x)
+        x = self.residual2d_block5(x)
+        x = self.residual2d_block6(x)
+        
+        # Apply Cropping2D
+        x = self.cropping_2d(x)
+        
+        # UpperTri
+        x = self.upper_tri(x)
+        
+        x = self.final(x)
+        
+        x = self.switch_reverse_triu(x, reverse_bool)
+        
         print(f"End shape: {x.size()}")
         
         return x
-
-
-
-#################################
-
-# def from_upptri(inputs):
-#     seq_len = inputs.shape[2]
-#     output_dim = inputs.shape[1]
-
-#     triu_tup = np.triu_indices(seq_len, 2)
-#     triu_index = list(triu_tup[0] + seq_len * triu_tup[1])
-#     unroll_repr = inputs.reshape(-1, 1)
-#     return torch.index_select(unroll_repr, 0,torch.tensor(triu_index))
-
-# def calc_R_R2(y_true, y_pred, num_targets, device='cuda:0'):
-#     '''
-#     Handles the Pearson R and R2 calculation
-#     '''
-#     product = torch.sum(torch.multiply(y_true, y_pred), dim=1)
-#     true_sum = torch.sum(y_true, dim=1)
-#     true_sumsq = torch.sum(torch.square(y_true), dim=1)
-#     pred_sum = torch.sum(y_pred, dim=1)
-#     pred_sumsq = torch.sum(torch.square(y_pred), dim=1)
-#     count = torch.sum(torch.ones(y_true.shape), dim=1).to(device)
-#     true_mean = torch.divide(true_sum, count)
-#     true_mean2 = torch.square(true_mean)
-
-#     pred_mean = torch.divide(pred_sum, count)
-#     pred_mean2 = torch.square(pred_mean)
-
-    # term1 = product
-    # term2 = -torch.multiply(true_mean, pred_sum)
-    # term3 = -torch.multiply(pred_mean, true_sum)
-    # term4 = torch.multiply(count, torch.multiply(true_mean, pred_mean))
-    # covariance = term1 + term2 + term3 + term4
-
-    # true_var = true_sumsq - torch.multiply(count, true_mean2)
-    # pred_var = pred_sumsq - torch.multiply(count, pred_mean2)
-    # pred_var = torch.where(torch.greater(pred_var, 1e-12), pred_var, np.inf*torch.ones(pred_var.shape).to(device))
-
-    # tp_var = torch.multiply(torch.sqrt(true_var), torch.sqrt(pred_var))
-
-    # correlation = torch.divide(covariance, tp_var)
-    # correlation = correlation[~torch.isnan(correlation)]
-    # correlation_mean = torch.mean(correlation)
-    # total = torch.subtract(true_sumsq, torch.multiply(count, true_mean2))
-    # resid1 = pred_sumsq
-    # resid2 = -2*product
-    # resid3 = true_sumsq
-    # resid = resid1 + resid2 + resid3
-    # r2 = torch.ones_like(torch.tensor(num_targets)) - torch.divide(resid, total)
-    # r2 = r2[~torch.isinf(r2)]
-    # r2_mean = torch.mean(r2)
-    # return correlation_mean, r2_mean
-
 

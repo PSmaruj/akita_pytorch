@@ -33,7 +33,7 @@ from copy import deepcopy
 
 
 class StochasticReverseComplement(nn.Module):
-    """Stochastically reverse complement a one hot encoded DNA sequence."""
+    """Stochastically reverse complement a one-hot encoded DNA sequence."""
     
     def __init__(self):
         super(StochasticReverseComplement, self).__init__()
@@ -46,11 +46,10 @@ class StochasticReverseComplement(nn.Module):
         
         if training:
             # Reverse complement: rearrange channels (A->T, C->G, G->C, T->A)
-            # The rearrangement is done across the 1st dimension (channel dimension)
             rc_seq_1hot = seq_1hot.index_select(dim=1, index=torch.tensor([3, 2, 1, 0], device=device))
             
             # Flip the sequence along the sequence axis (dim=-1), keeping the channel order intact
-            rc_seq_1hot = torch.flip(rc_seq_1hot, dims=[-1])  # Flip along the sequence axis (dim=-1)
+            rc_seq_1hot = torch.flip(rc_seq_1hot, dims=[-1])
             
             # Create a random boolean tensor to decide whether to reverse, shape: (batch_size,)
             reverse_bool = torch.rand(seq_1hot.size(0), device=device) > 0.5
@@ -66,8 +65,10 @@ class StochasticReverseComplement(nn.Module):
         else:
             # If not training, no need to stochastically reverse, return seq_1hot unchanged
             result = seq_1hot
+            reverse_bool = torch.zeros(seq_1hot.size(0), device=device, dtype=torch.bool)
         
-        return result
+        # Return both the sequence and the reverse boolean flag
+        return result, reverse_bool
 
 
 class StochasticShift(nn.Module):
@@ -123,7 +124,7 @@ class StochasticShift(nn.Module):
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, filters, kernel_size, stride=1, dilation_rate=1, pool_size=1, pool_type='max', 
-                 norm_type=None, bn_momentum=0.99, dropout_prob=0.4, use_dropout=True):
+                 norm_type=None, bn_momentum=0.9265, dropout_prob=0.4, use_dropout=True):
         super(ConvBlock, self).__init__()
         
         # Convolution Layer
@@ -319,223 +320,263 @@ class Conv2DBlock(nn.Module):
     def forward(self, x):
         return self.block(x)
     
-    
 
-################################
+class Symmetrize2D(nn.Module):
+    """Take the average of a matrix and its transpose to enforce symmetry."""
+    def __init__(self):
+        super(Symmetrize2D, self).__init__()
 
-
-# class Symmetrize2D(nn.Module):
-#     def __init__(self):
-#         super(Symmetrize2D, self).__init__()
-
-#     def forward(self, x):
-#         x_t = torch.transpose(x, 2,3)
-#         x_sym = (x + x_t) / 2
-#         return x_sym
-
-# class DilatedResidual2D(nn.Module):
-#     def __init__(self, in_channels, kernel_size, rate_mult, repeat, dropout):
-#         super(DilatedResidual2D, self).__init__()
-#         self.dropout = nn.Dropout2d(p=dropout)
-
-#         self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size, padding=kernel_size//2)
-#         self.conv2 = nn.Conv2d(in_channels, in_channels, kernel_size, padding=kernel_size//2)
-
-#         # Define dilations
-#         dilations = [1]
-#         for i in range(1, repeat):
-#             dilations.append(int(i*rate_mult))
-
-#         # Define residual blocks
-#         self.res_blocks = nn.ModuleList()
-#         for dilation in dilations:
-#             self.res_blocks.append(nn.Conv2d(in_channels, in_channels, kernel_size, dilation=dilation, padding=dilation))
-
-    # def forward(self, x):
-    #     out = self.conv1(x)
-    #     out = F.relu(out)
-    #     out = self.dropout(out)
-
-    #     out = self.conv2(out)
-    #     out = F.relu(out)
-    #     out = self.dropout(out)
-
-    #     # Residual block
-    #     for block in self.res_blocks:
-    #         res = out
-    #         out = F.relu(out)
-    #         out = self.dropout(out)
-
-    #         out = block(out)
-    #         out = F.relu(out)
-    #         out = self.dropout(out)
-
-    #         out = out + res
-
-    #     return out
-
-# class Cropping2D(nn.Module):
-#     def __init__(self, cropping):
-#         super(Cropping2D, self).__init__()
-#         self.cropping = cropping
-
-#     def forward(self, inputs):
-#         _, _, h, w = inputs.size()
-#         cropped = inputs[:, :, self.cropping:h-self.cropping, self.cropping:w-self.cropping]
-#         return cropped
+    def forward(self, x):
+        # Transpose the last two dimensions (height and width for 2D data)
+        x_t = torch.transpose(x, 2, 3)  # Swap dimensions 2 and 3
+        # Compute the symmetric average
+        x_sym = (x + x_t) / 2
+        return x_sym   
 
 
-# class UpperTri(nn.Module):
-#     def __init__(self, diagonal_offset=2):
-#         super(UpperTri, self).__init__()
-#         self.diagonal_offset = diagonal_offset
+class DilatedResidualBlock2D(nn.Module):
+    def __init__(self, in_channels=48, mid_channels=24, kernel_size=3, dilation_rate=1, dropout_prob=0.1, bn_momentum=0.9265):
+        """
+        A dilated residual block with symmetry enforcement.
+        Args:
+            in_channels (int): Number of input and output channels.
+            mid_channels (int): Number of intermediate channels.
+            kernel_size (int): Kernel size for the convolutional layers.
+            dilation_rate (int): Dilation rate for the convolutional layers.
+            dropout_prob (float): Dropout probability.
+        """
+        super(DilatedResidualBlock2D, self).__init__()
+        self.relu = nn.ReLU()
+        
+        # First convolutional layer (reduces channels)
+        self.conv1 = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=mid_channels,
+            kernel_size=kernel_size,
+            padding=(kernel_size // 2) * dilation_rate,  # Adjust padding for dilation
+            dilation=dilation_rate,  # Add dilation
+            bias=False
+        )
+        self.bn1 = nn.BatchNorm2d(mid_channels, momentum = bn_momentum)
 
-#     def forward(self, inputs):
-#         seq_len = inputs.shape[2]
-#         output_dim = inputs.shape[1]
+        # Second convolutional layer (restores original channel count)
+        self.conv2 = nn.Conv2d(
+            in_channels=mid_channels,
+            out_channels=in_channels,
+            kernel_size=1,
+            padding=(1 // 2) * dilation_rate,  # Adjust padding for dilation
+            dilation=dilation_rate,  # Add dilation
+            bias=False
+        )
+        self.bn2 = nn.BatchNorm2d(in_channels, momentum = bn_momentum)
+        
+        self.dropout = nn.Dropout2d(p=dropout_prob)
 
-#         triu_tup = np.triu_indices(seq_len, self.diagonal_offset)
-#         triu_index = list(triu_tup[0]+ seq_len*triu_tup[1])
-#         unroll_repr = inputs.reshape(-1, output_dim, seq_len**2)
-#         return torch.index_select(unroll_repr, 2, torch.tensor(triu_index))
+        # Symmetrization layer
+        self.symmetrize = Symmetrize2D()
 
-#     def extra_repr(self):
-#         return 'diagonal_offset={}'.format(self.diagonal_offset)
+    def forward(self, x):
+        # Save residual input
+        residual = x
 
+        # First convolutional block
+        x = self.relu(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
 
-# class Final(nn.Module):
-#     def __init__(self, l2_scale=0, l1_scale=0, **kwargs):
-#         super(Final, self).__init__()
-#         # self.flatten = nn.Flatten()
-#         self.l2_scale = l2_scale
-#         self.l1_scale = l1_scale
-#         self.dense = nn.Linear(in_features=12,out_features=1,bias=False)
-#     def forward(self,x):
-#         # x = self.flatten(x)
-#         # print(x.size())
-#         x = self.dense(x)
-#         # regularize
-#         if self.l2_scale > 0:
-#             x = F.normalize(x, p=2, dim=-1)
-#         if self.l1_scale > 0:
-#             x = F.normalize(x, p=1, dim=-1)
+        # Second convolutional block
+        x = self.relu(x)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        
+        # Dropout
+        x = self.dropout(x)
 
-#         return x
+        # Add residual connection
+        x = x + residual
 
-# def final(inputs, units, activation='linear', flatten=False,
-#           kernel_initializer='he_normal', l2_scale=0, l1_scale=0, **kwargs):
-#     """Final simple transformation before comparison to targets.
-#     Args:
-#         inputs:         [batch_size, seq_length, features] input sequence
-#         units:          Dense units
-#         activation:     relu/gelu/etc
-#         flatten:        Flatten positional axis.
-#         l2_scale:       L2 regularization weight.
-#         l1_scale:       L1 regularization weight.
-#     Returns:
-#         [batch_size, seq_length(?), units] output sequence
-#     """
-#     current = inputs
-#
-#     # flatten
-#     if flatten:
-#         batch_size, seq_len, seq_depth = current.size()
-#         current = current.view(batch_size, 1, seq_len * seq_depth)
-#
-#     # dense
-#     current = nn.Linear(
-#         in_features=current.size(-1),
-#         out_features=units,
-#         bias=True
-#     )(current)
-#     if activation == 'relu':
-#         current = F.relu(current)
-#     elif activation == 'gelu':
-#         current = F.gelu(current)
-#     elif activation == 'sigmoid':
-#         current = torch.sigmoid(current)
-#     elif activation == 'tanh':
-#         current = torch.tanh(current)
-#
-#     # regularize
-#     if l2_scale > 0:
-#         current = F.normalize(current,p=2, dim=-1)
-#     if l1_scale > 0:
-#         current = F.normalize(current,p=1, dim=-1)
-#
-#     return current
+        # Symmetrize
+        x = self.symmetrize(x)
+
+        return x
 
 
-# class PearsonR(nn.Module):
-#     def __init__(self, num_targets, summarize=True):
-#         super(PearsonR, self).__init__()
-#         self.summarize = summarize
-#         self.shape = (num_targets,)
-#         self.count = nn.Parameter(torch.zeros(self.shape))
+class Cropping2D(nn.Module):
+    def __init__(self, cropping):
+        super(Cropping2D, self).__init__()
+        self.cropping = cropping
 
-#         self.product = nn.Parameter(torch.zeros(self.shape))
-#         self.true_sum = nn.Parameter(torch.zeros(self.shape))
-#         self.true_sumsq = nn.Parameter(torch.zeros(self.shape))
-#         self.pred_sum = nn.Parameter(torch.zeros(self.shape))
-#         self.pred_sumsq = nn.Parameter(torch.zeros(self.shape))
+    def forward(self, inputs):
+        _, _, h, w = inputs.size()  # Get the height and width of the input tensor
+        cropped = inputs[:, :, self.cropping:h - self.cropping, self.cropping:w - self.cropping]
+        return cropped
 
-    # def forward(self, y_true, y_pred):
-    #     y_true = y_true.float()
-    #     y_pred = y_pred.float()
 
-    #     if len(y_true.shape) == 2:
-    #         reduce_axes = 0
-    #     else:
-    #         reduce_axes = [0,1]
+class UpperTri(nn.Module):
+    ''' Unroll matrix to its upper triangular portion. '''
+    def __init__(self, diagonal_offset=2):
+        super(UpperTri, self).__init__()
+        self.diagonal_offset = diagonal_offset
 
-    #     product = torch.sum(torch.mul(y_true, y_pred), dim=reduce_axes)
-    #     self.product.data.add_(product)
+    def forward(self, inputs):
+        # Get the batch size, output_dim, and seq_len from the shape of the input tensor
+        batch_size, output_dim, seq_len, _ = inputs.shape
+        
+        # Generate the upper triangular indices
+        triu_tup = torch.triu_indices(seq_len, seq_len, self.diagonal_offset)
 
-    #     true_sum = torch.sum(y_true, dim=reduce_axes)
-    #     self.true_sum.data.add_(true_sum)
+        # Flatten the input tensor to shape [batch_size, output_dim, seq_len^2]
+        unroll_repr = inputs.reshape(batch_size, output_dim, seq_len * seq_len)  # Use .reshape() instead of .view()
+        
+        # Move triu_index to the same device as the input tensor
+        triu_index = triu_tup[0] * seq_len + triu_tup[1]
+        triu_index = triu_index.to(unroll_repr.device)  # Make sure it is on the same device
+        
+        # Unsqueeze triu_index to make it [seq_len^2] and expand it across all the batch examples and channels
+        triu_index = triu_index.unsqueeze(0).unsqueeze(0).expand(batch_size, output_dim, -1)
 
-    #     true_sumsq = torch.sum(torch.pow(y_true, 2), dim=reduce_axes)
-    #     self.true_sumsq.data.add_(true_sumsq)
+        # Select the upper triangular part for each example in the batch, across all channels
+        return torch.gather(unroll_repr, 2, triu_index)
 
-    #     pred_sum = torch.sum(y_pred, dim=reduce_axes)
-    #     self.pred_sum.data.add_(pred_sum)
 
-    #     pred_sumsq = torch.sum(torch.pow(y_pred, 2), dim=reduce_axes)
-    #     self.pred_sumsq.data.add_(pred_sumsq)
+class Final(nn.Module):
+    def __init__(self, l2_scale=0, l1_scale=0, activation='linear', **kwargs):
+        super(Final, self).__init__()
+        self.l2_scale = l2_scale
+        self.l1_scale = l1_scale
+        self.activation = activation
+        
+        # Dense layer to map seq_len (48) to new_seq_len (5)
+        self.dense = nn.Linear(in_features=48, out_features=5, bias=True)  # Transform channels (seq_len) only
 
-    #     count = torch.ones_like(y_true)
-    #     count = torch.sum(count, dim=reduce_axes)
-    #     self.count.data.add_(count)
+    def forward(self, x):
+        print(f"Input shape: {x.shape}")  # Debug print
 
-    # def result(self):
-    #     true_mean = torch.div(self.true_sum, self.count)
-    #     true_mean2 = torch.pow(true_mean, 2)
-    #     pred_mean = torch.div(self.pred_sum, self.count)
-    #     pred_mean2 = torch.pow(pred_mean, 2)
+        # Get batch size, seq_len, and feature_dim
+        batch_size, seq_len, feature_dim = x.shape
 
-    #     term1 = self.product
-    #     term2 = -torch.mul(true_mean, self.pred_sum)
-    #     term3 = -torch.mul(pred_mean, self.true_sum)
-    #     term4 = torch.mul(self.count, torch.mul(true_mean, pred_mean))
-    #     covariance = term1 + term2 + term3 + term4
+        # Transpose to make seq_len the last dimension: [batch_size, feature_dim, seq_len]
+        x = x.transpose(1, 2)
 
-    #     true_var = self.true_sumsq - torch.mul(self.count, true_mean2)
-    #     pred_var = self.pred_sumsq - torch.mul(self.count, pred_mean2)
-    #     pred_var = torch.where(pred_var > 1e-12, pred_var, torch.full_like(pred_var, float('inf')))
+        # Apply the dense layer along seq_len (last dimension)
+        x = self.dense(x)  # Shape becomes [batch_size, feature_dim, new_seq_len]
 
-    #     tp_var = torch.mul(torch.sqrt(true_var), torch.sqrt(pred_var))
-    #     correlation = torch.div(covariance, tp_var)
+        # Transpose back to [batch_size, new_seq_len, feature_dim]
+        x = x.transpose(1, 2)
 
-    #     if self.summarize:
-    #         return torch.mean(correlation)
-    #     else:
-    #         return correlation
+        # Apply activation function
+        if self.activation == 'relu':
+            x = F.relu(x)
+        elif self.activation == 'gelu':
+            x = F.gelu(x)
+        elif self.activation == 'linear':
+            pass  # No activation (linear is default)
+        else:
+            raise ValueError(f"Unsupported activation function: {self.activation}")
 
-    # def reset_state(self):
-    #     self.product.data.fill_(0)
-    #     self.true_sum.data.fill_(0)
-    #     self.true_sumsq.data.fill_(0)
-    #     self.pred_sum.data.fill_(0)
-    #     self.pred_sumsq.data.fill_(0)
-    #     self.count.data.fill_(0)
+        # Optionally apply regularization (L1 and L2)
+        if self.l2_scale > 0:
+            x = F.normalize(x, p=2, dim=-1)  # L2 normalization
 
+        if self.l1_scale > 0:
+            x = F.normalize(x, p=1, dim=-1)  # L1 normalization
+
+        return x
+
+
+class SwitchReverseTriu(nn.Module):
+    def __init__(self, diagonal_offset, matrix_size):
+        """
+        Args:
+            diagonal_offset (int): Offset for the diagonal in the upper triangular matrix.
+            matrix_size (int): Fixed size of the square matrix (e.g., 448 for 448x448).
+        """
+        super(SwitchReverseTriu, self).__init__()
+        self.diagonal_offset = diagonal_offset
+        self.matrix_size = matrix_size  # Fixed matrix size
+
+    def forward(self, x, reverse_bool):
+        """
+        Forward pass with optional reversal of the upper triangular indices.
+        
+        Args:
+            x (Tensor): Input tensor with shape [batch_size, channels, matrix_size, matrix_size].
+            reverse_bool (Tensor): Boolean tensor of shape [batch_size] indicating reversal.
+        
+        Returns:
+            Tensor: Processed tensor with the same shape as input.
+        """
+        # Ensure matrix dimensions match the expected size
+        batch_size, channels, height, width = x.size()
+        
+        print()
+        
+        # assert height == self.matrix_size and width == self.matrix_size, (
+        #     f"Input matrix size mismatch! Expected ({self.matrix_size}, {self.matrix_size}), "
+        #     f"but got ({height}, {width})."
+        # )
+
+        # Get upper triangular indices
+        ut_indices = torch.triu_indices(self.matrix_size, self.matrix_size, self.diagonal_offset).to(x.device)
+        ut_len = len(ut_indices[0])  # Number of elements in the upper triangular part
+        
+        # Flatten the input tensor's last two dimensions for indexing
+        x_flat = x.view(batch_size, channels, -1)  # Shape: [batch_size, channels, matrix_size*matrix_size]
+
+        # Extract upper triangular elements
+        ut_elements = x_flat[:, :, ut_indices[0] * self.matrix_size + ut_indices[1]]  # Shape: [batch_size, channels, ut_len]
+
+        # Conditionally reverse along the last dimension (upper triangular indices)
+        if reverse_bool.any():
+            reversed_elements = torch.flip(ut_elements, dims=[2])  # Reverse the last dimension
+            ut_elements = torch.where(reverse_bool.view(-1, 1, 1), reversed_elements, ut_elements)
+
+        # Reconstruct the matrix with the upper triangular elements
+        result = torch.zeros_like(x_flat, device=x.device)  # Shape: [batch_size, channels, matrix_size*matrix_size]
+        result[:, :, ut_indices[0] * self.matrix_size + ut_indices[1]] = ut_elements
+
+        # Reshape back to original matrix dimensions
+        result = result.view(batch_size, channels, self.matrix_size, self.matrix_size)
+
+        return result
+
+
+class SwitchReverseTriu(nn.Module):
+    def __init__(self, diagonal_offset, matrix_size):
+        """
+        Args:
+            diagonal_offset (int): Offset for the diagonal in the upper triangular matrix.
+            matrix_size (int): Size of the square matrix (e.g., 448 for 448x448).
+        """
+        super(SwitchReverseTriu, self).__init__()
+        self.diagonal_offset = diagonal_offset
+        self.matrix_size = matrix_size  # Square matrix size
+        self.ut_len = (matrix_size * (matrix_size + 1)) // 2  # Total upper triangular elements
+
+    def forward(self, x, reverse_bool):
+        """
+        Forward pass with optional reversal of the upper triangular indices.
+
+        Args:
+            x (Tensor): Input tensor with shape [batch_size, channels, ut_len].
+            reverse_bool (Tensor): Boolean tensor of shape [batch_size] indicating reversal.
+
+        Returns:
+            Tensor: Processed tensor with the same shape as input.
+        """
+        batch_size, channels, length = x.size()
+
+        # Get upper triangular indices for the matrix
+        ut_indices = torch.triu_indices(self.matrix_size, self.matrix_size, self.diagonal_offset).to(x.device)
+
+        # Flip the elements in the upper triangle based on reverse_bool
+        if reverse_bool.any():
+            # Reverse the triangular elements (swap upper triangle elements)
+            for b in range(batch_size):
+                if reverse_bool[b]:
+                    # Get the elements for the upper triangle in the current batch
+                    upper_triangle = x[b, :, :]  # [channels, ut_len]
+                    flipped = torch.flip(upper_triangle, dims=[1])  # Flip along the last dimension (upper triangle)
+                    x[b, :, :] = flipped
+
+        return x
