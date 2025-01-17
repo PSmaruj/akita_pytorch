@@ -260,7 +260,5 @@ class SeqNN(nn.Module):
         
         x = self.switch_reverse_triu(x, reverse_bool)
         
-        print(f"End shape: {x.size()}")
-        
         return x
 

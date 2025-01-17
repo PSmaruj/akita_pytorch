@@ -41,9 +41,6 @@ class StochasticReverseComplement(nn.Module):
     def forward(self, seq_1hot, training=True):
         device = seq_1hot.device  # Ensure tensors are on the same device
         
-        # Print the input shape of seq_1hot
-        print(f"Input seq_1hot shape: {seq_1hot.shape}")
-        
         if training:
             # Reverse complement: rearrange channels (A->T, C->G, G->C, T->A)
             rc_seq_1hot = seq_1hot.index_select(dim=1, index=torch.tensor([3, 2, 1, 0], device=device))
@@ -450,7 +447,6 @@ class Final(nn.Module):
         self.dense = nn.Linear(in_features=48, out_features=5, bias=True)  # Transform channels (seq_len) only
 
     def forward(self, x):
-        print(f"Input shape: {x.shape}")  # Debug print
 
         # Get batch size, seq_len, and feature_dim
         batch_size, seq_len, feature_dim = x.shape
@@ -508,13 +504,6 @@ class SwitchReverseTriu(nn.Module):
         """
         # Ensure matrix dimensions match the expected size
         batch_size, channels, height, width = x.size()
-        
-        print()
-        
-        # assert height == self.matrix_size and width == self.matrix_size, (
-        #     f"Input matrix size mismatch! Expected ({self.matrix_size}, {self.matrix_size}), "
-        #     f"but got ({height}, {width})."
-        # )
 
         # Get upper triangular indices
         ut_indices = torch.triu_indices(self.matrix_size, self.matrix_size, self.diagonal_offset).to(x.device)
