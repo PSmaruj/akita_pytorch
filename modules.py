@@ -127,8 +127,9 @@ class ConvBlock(nn.Module):
         # Convolution Layer
         self.conv = nn.Conv1d(in_channels, filters, kernel_size, stride=stride, padding=(kernel_size // 2), dilation=dilation_rate, bias=False)
         
+        # Both in pytorch and tensorflow, gammas (weights) are initialized as 1s and betas (biases) as 0s, by default.
         # Batch Normalization
-        self.batch_norm = nn.BatchNorm1d(filters, momentum=bn_momentum) if norm_type == 'batch' else None
+        self.batch_norm = nn.BatchNorm1d(filters, eps=0.001, momentum=bn_momentum) if norm_type == 'batch' else None
         
         # Pooling (MaxPool)
         self.pool = nn.MaxPool1d(pool_size) if pool_type == 'max' else None
@@ -179,7 +180,7 @@ class ConvTower(nn.Module):
 
             # Normalization
             if norm_type == "batch":
-                layers.append(nn.BatchNorm1d(int(filters), momentum=bn_momentum))
+                layers.append(nn.BatchNorm1d(int(filters), eps=0.001, momentum=bn_momentum))
 
             # Pooling
             layers.append(nn.MaxPool1d(kernel_size=pool_size))
@@ -194,19 +195,20 @@ class ConvTower(nn.Module):
 
 
 class ResidualDilatedBlock1D(nn.Module):
-    def __init__(self, in_channels, mid_channels, dropout_rate=0.1, dilation_rate=1, bn_momentum=0.9265):
+    def __init__(self, in_channels, mid_channels, dropout_rate=0.4, dilation_rate=1, bn_momentum=0.9265):
         super(ResidualDilatedBlock1D, self).__init__()
         self.relu1 = nn.ReLU()
         self.conv1 = nn.Conv1d(
             in_channels, mid_channels, kernel_size=3, padding=dilation_rate, dilation=dilation_rate, bias=False
         )
-        self.bn1 = nn.BatchNorm1d(mid_channels, momentum=bn_momentum)
+        self.bn1 = nn.BatchNorm1d(mid_channels, eps=0.001, momentum=bn_momentum)
         
         self.relu2 = nn.ReLU()
         self.conv2 = nn.Conv1d(
             mid_channels, in_channels, kernel_size=1, padding=0, bias=False
         )
-        self.bn2 = nn.BatchNorm1d(in_channels, momentum=bn_momentum)
+        self.bn2 = nn.BatchNorm1d(in_channels, eps=0.001, momentum=bn_momentum)
+        nn.init.constant_(self.bn2.weight, 0.0) #gammas initialized to 0s
         
         self.dropout = nn.Dropout(dropout_rate)
         
@@ -227,7 +229,7 @@ class ResidualDilatedBlock1D(nn.Module):
 
 
 class ConvBlockReduce(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=5, bn_momentum=0.9):
+    def __init__(self, in_channels, out_channels, kernel_size=5, bn_momentum=0.9265):
         super(ConvBlockReduce, self).__init__()
         self.layers = nn.Sequential(
             nn.ReLU(),
@@ -239,7 +241,7 @@ class ConvBlockReduce(nn.Module):
                 padding=kernel_size // 2,  # To preserve sequence length
                 bias=False
             ),
-            nn.BatchNorm1d(out_channels, momentum=bn_momentum),
+            nn.BatchNorm1d(out_channels, eps=0.001, momentum=bn_momentum),
             nn.ReLU()
         )
 
@@ -311,7 +313,7 @@ class Conv2DBlock(nn.Module):
         self.block = nn.Sequential(
             nn.ReLU(),
             nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2, bias=False),
-            nn.BatchNorm2d(out_channels, momentum=bn_momentum)
+            nn.BatchNorm2d(out_channels, eps=0.001, momentum=bn_momentum)
         )
     
     def forward(self, x):
@@ -350,11 +352,11 @@ class DilatedResidualBlock2D(nn.Module):
             in_channels=in_channels,
             out_channels=mid_channels,
             kernel_size=kernel_size,
-            padding=(kernel_size // 2) * dilation_rate,  # Adjust padding for dilation
+            padding=(kernel_size // 2) * dilation_rate,
             dilation=dilation_rate,  # Add dilation
             bias=False
         )
-        self.bn1 = nn.BatchNorm2d(mid_channels, momentum = bn_momentum)
+        self.bn1 = nn.BatchNorm2d(mid_channels, eps=0.001, momentum = bn_momentum)
 
         # Second convolutional layer (restores original channel count)
         self.conv2 = nn.Conv2d(
@@ -365,7 +367,8 @@ class DilatedResidualBlock2D(nn.Module):
             dilation=dilation_rate,  # Add dilation
             bias=False
         )
-        self.bn2 = nn.BatchNorm2d(in_channels, momentum = bn_momentum)
+        self.bn2 = nn.BatchNorm2d(in_channels, eps=0.001, momentum = bn_momentum)
+        nn.init.constant_(self.bn2.weight, 0.0) #gammas initialized to 0s
         
         self.dropout = nn.Dropout2d(p=dropout_prob)
 
@@ -444,7 +447,7 @@ class Final(nn.Module):
         self.activation = activation
         
         # Dense layer to map seq_len (48) to new_seq_len (5)
-        self.dense = nn.Linear(in_features=48, out_features=5, bias=True)  # Transform channels (seq_len) only
+        self.dense = nn.Linear(in_features=48, out_features=5) #, bias=True)  # Transform channels (seq_len) only
 
     def forward(self, x):
 
@@ -478,56 +481,6 @@ class Final(nn.Module):
             x = F.normalize(x, p=1, dim=-1)  # L1 normalization
 
         return x
-
-
-class SwitchReverseTriu(nn.Module):
-    def __init__(self, diagonal_offset, matrix_size):
-        """
-        Args:
-            diagonal_offset (int): Offset for the diagonal in the upper triangular matrix.
-            matrix_size (int): Fixed size of the square matrix (e.g., 448 for 448x448).
-        """
-        super(SwitchReverseTriu, self).__init__()
-        self.diagonal_offset = diagonal_offset
-        self.matrix_size = matrix_size  # Fixed matrix size
-
-    def forward(self, x, reverse_bool):
-        """
-        Forward pass with optional reversal of the upper triangular indices.
-        
-        Args:
-            x (Tensor): Input tensor with shape [batch_size, channels, matrix_size, matrix_size].
-            reverse_bool (Tensor): Boolean tensor of shape [batch_size] indicating reversal.
-        
-        Returns:
-            Tensor: Processed tensor with the same shape as input.
-        """
-        # Ensure matrix dimensions match the expected size
-        batch_size, channels, height, width = x.size()
-
-        # Get upper triangular indices
-        ut_indices = torch.triu_indices(self.matrix_size, self.matrix_size, self.diagonal_offset).to(x.device)
-        ut_len = len(ut_indices[0])  # Number of elements in the upper triangular part
-        
-        # Flatten the input tensor's last two dimensions for indexing
-        x_flat = x.view(batch_size, channels, -1)  # Shape: [batch_size, channels, matrix_size*matrix_size]
-
-        # Extract upper triangular elements
-        ut_elements = x_flat[:, :, ut_indices[0] * self.matrix_size + ut_indices[1]]  # Shape: [batch_size, channels, ut_len]
-
-        # Conditionally reverse along the last dimension (upper triangular indices)
-        if reverse_bool.any():
-            reversed_elements = torch.flip(ut_elements, dims=[2])  # Reverse the last dimension
-            ut_elements = torch.where(reverse_bool.view(-1, 1, 1), reversed_elements, ut_elements)
-
-        # Reconstruct the matrix with the upper triangular elements
-        result = torch.zeros_like(x_flat, device=x.device)  # Shape: [batch_size, channels, matrix_size*matrix_size]
-        result[:, :, ut_indices[0] * self.matrix_size + ut_indices[1]] = ut_elements
-
-        # Reshape back to original matrix dimensions
-        result = result.view(batch_size, channels, self.matrix_size, self.matrix_size)
-
-        return result
 
 
 class SwitchReverseTriu(nn.Module):
