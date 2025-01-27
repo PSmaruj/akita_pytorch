@@ -46,7 +46,7 @@ class SeqNN(nn.Module):
             pool_size=2,
             pool_type='max',
             norm_type='batch',
-            bn_momentum=0.9265,
+            bn_momentum=0.0735, # 1 - tensorflow momentum
             use_dropout=False
         )
 
@@ -59,7 +59,7 @@ class SeqNN(nn.Module):
             pool_size=2,
             repeat=10,
             norm_type="batch",
-            bn_momentum=0.9265
+            bn_momentum=0.0735
         )
 
         # ResidualDilatedBlock
@@ -124,7 +124,7 @@ class SeqNN(nn.Module):
             in_channels=96,
             out_channels=64,
             kernel_size=5,
-            bn_momentum=0.9265
+            bn_momentum=0.0735
         )
         
         # HEAD

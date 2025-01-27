@@ -8,6 +8,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler, ConcatDataset
 import torch.nn.functional as F
 
+import torch.nn.init as init
 from torch.cuda.amp.grad_scaler import GradScaler
 from torch.cuda.amp import autocast
 
@@ -121,19 +122,22 @@ class StochasticShift(nn.Module):
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, filters, kernel_size, stride=1, dilation_rate=1, pool_size=1, pool_type='max', 
-                 norm_type=None, bn_momentum=0.9265, dropout_prob=0.4, use_dropout=True):
+                 norm_type=None, bn_momentum=0.0735, dropout_prob=0.4, use_dropout=True):
         super(ConvBlock, self).__init__()
-        
+
         # Convolution Layer
         self.conv = nn.Conv1d(in_channels, filters, kernel_size, stride=stride, padding=(kernel_size // 2), dilation=dilation_rate, bias=False)
-        
+
+        # Initialize weights to match TensorFlow
+        init.kaiming_normal_(self.conv.weight, mode='fan_out', nonlinearity='relu')
+
         # Both in pytorch and tensorflow, gammas (weights) are initialized as 1s and betas (biases) as 0s, by default.
         # Batch Normalization
         self.batch_norm = nn.BatchNorm1d(filters, eps=0.001, momentum=bn_momentum) if norm_type == 'batch' else None
-        
+
         # Pooling (MaxPool)
         self.pool = nn.MaxPool1d(pool_size) if pool_type == 'max' else None
-        
+
         # Dropout (Optional)
         self.use_dropout = use_dropout
         self.dropout = nn.Dropout(p=dropout_prob) if self.use_dropout else None
@@ -144,8 +148,6 @@ class ConvBlock(nn.Module):
         # Apply Batch Normalization if specified
         if self.batch_norm:
             x = self.batch_norm(x)
-        
-        x = F.relu(x)
         
         # Apply pooling if specified
         if self.pool:
@@ -159,7 +161,7 @@ class ConvBlock(nn.Module):
 
 
 class ConvTower(nn.Module):
-    def __init__(self, in_channels, filters_init, filters_mult, kernel_size, pool_size, repeat, norm_type="batch", bn_momentum=0.9265):
+    def __init__(self, in_channels, filters_init, filters_mult, kernel_size, pool_size, repeat, norm_type="batch", bn_momentum=0.0735):
         super(ConvTower, self).__init__()
         
         layers = []
@@ -195,7 +197,7 @@ class ConvTower(nn.Module):
 
 
 class ResidualDilatedBlock1D(nn.Module):
-    def __init__(self, in_channels, mid_channels, dropout_rate=0.4, dilation_rate=1, bn_momentum=0.9265):
+    def __init__(self, in_channels, mid_channels, dropout_rate=0.4, dilation_rate=1, bn_momentum=0.0735):
         super(ResidualDilatedBlock1D, self).__init__()
         self.relu1 = nn.ReLU()
         self.conv1 = nn.Conv1d(
@@ -229,7 +231,7 @@ class ResidualDilatedBlock1D(nn.Module):
 
 
 class ConvBlockReduce(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=5, bn_momentum=0.9265):
+    def __init__(self, in_channels, out_channels, kernel_size=5, bn_momentum=0.0735):
         super(ConvBlockReduce, self).__init__()
         self.layers = nn.Sequential(
             nn.ReLU(),
@@ -308,7 +310,7 @@ class ConcatDist2D(nn.Module):
 
 
 class Conv2DBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, bn_momentum=0.9265):
+    def __init__(self, in_channels, out_channels, kernel_size=3, bn_momentum=0.0735):
         super(Conv2DBlock, self).__init__()
         self.block = nn.Sequential(
             nn.ReLU(),
@@ -334,7 +336,7 @@ class Symmetrize2D(nn.Module):
 
 
 class DilatedResidualBlock2D(nn.Module):
-    def __init__(self, in_channels=48, mid_channels=24, kernel_size=3, dilation_rate=1, dropout_prob=0.1, bn_momentum=0.9265):
+    def __init__(self, in_channels=48, mid_channels=24, kernel_size=3, dilation_rate=1, dropout_prob=0.1, bn_momentum=0.0735):
         """
         A dilated residual block with symmetry enforcement.
         Args:
