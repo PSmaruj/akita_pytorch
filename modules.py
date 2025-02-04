@@ -13,26 +13,6 @@ from torch.cuda.amp.grad_scaler import GradScaler
 from torch.cuda.amp import autocast
 
 
-# from torchsummary import summary
-from sklearn.metrics import r2_score, precision_score, f1_score
-
-# from ray import tune
-
-import json
-import itertools
-from itertools import groupby
-import gzip
-from io import BytesIO
-from time import time
-
-import matplotlib.pyplot as plt
-
-import pyBigWig
-from scipy.sparse import csc_matrix
-import math
-from copy import deepcopy
-
-
 class StochasticReverseComplement(nn.Module):
     """Stochastically reverse complement a one-hot encoded DNA sequence."""
     
@@ -156,7 +136,7 @@ class ConvBlock(nn.Module):
         # Apply dropout if specified
         if self.use_dropout:
             x = self.dropout(x)
-            
+        
         return x
 
 
@@ -303,6 +283,7 @@ class ConcatDist2D(nn.Module):
         matrix_repr1 = pos
         matrix_repr2 = pos.t()
         dist = torch.abs(matrix_repr1 - matrix_repr2).float()  # [seq_len, seq_len]
+        # dist = torch.abs(matrix_repr1 - matrix_repr2).to(torch.float64) # to set a particular precision
         dist = dist.unsqueeze(0).unsqueeze(0).repeat(batch_size, 1, 1, 1)  # [batch_size, 1, seq_len, seq_len]
 
         # Concatenate along the feature axis
