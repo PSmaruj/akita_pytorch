@@ -423,14 +423,15 @@ class UpperTri(nn.Module):
 
 
 class Final(nn.Module):
-    def __init__(self, l2_scale=0, l1_scale=0, activation='linear', **kwargs):
+    def __init__(self, l2_scale=0, l1_scale=0, activation='linear', units=5, **kwargs):
         super(Final, self).__init__()
         self.l2_scale = l2_scale
         self.l1_scale = l1_scale
         self.activation = activation
+        self.units = units
         
         # Dense layer to map seq_len (48) to new_seq_len (5)
-        self.dense = nn.Linear(in_features=48, out_features=5) #, bias=True)  # Transform channels (seq_len) only
+        self.dense = nn.Linear(in_features=48, out_features=self.units) #, bias=True)  # Transform channels (seq_len) only
 
     def forward(self, x):
 

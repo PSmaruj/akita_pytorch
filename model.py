@@ -188,13 +188,14 @@ class SeqNN(nn.Module):
             dropout_prob=0.1)
         
         # Cropping2D
-        self.cropping_2d = Cropping2D(cropping=32)
+        # self.cropping_2d = Cropping2D(cropping=32)
+        self.cropping_2d = Cropping2D(cropping=64)
         
         # UpperTri
         self.upper_tri = UpperTri()
         
         # Final
-        self.final = Final(units=2, activation='linear')
+        self.final = Final(units=1, activation='linear')
         
         self.switch_reverse_triu = SwitchReverseTriu(diagonal_offset=2, matrix_size=448)
         
