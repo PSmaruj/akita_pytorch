@@ -1,16 +1,7 @@
-import numpy as np
-import random
-import os
+
 import torch
 import torch.nn as nn
-from torch import Tensor
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler, ConcatDataset
 import torch.nn.functional as F
-
-import torch.nn.init as init
-from torch.cuda.amp.grad_scaler import GradScaler
-from torch.cuda.amp import autocast
 
 
 class StochasticReverseComplement(nn.Module):
@@ -19,33 +10,27 @@ class StochasticReverseComplement(nn.Module):
     def __init__(self):
         super(StochasticReverseComplement, self).__init__()
 
-    def forward(self, seq_1hot, training=True):
+    def forward(self, seq_1hot):
         device = seq_1hot.device  # Ensure tensors are on the same device
         
-        if training:
+        if self.training:
             # Reverse complement: rearrange channels (A->T, C->G, G->C, T->A)
             rc_seq_1hot = seq_1hot.index_select(dim=1, index=torch.tensor([3, 2, 1, 0], device=device))
             
-            # Flip the sequence along the sequence axis (dim=-1), keeping the channel order intact
+            # Flip the sequence along the sequence axis (dim=-1)
             rc_seq_1hot = torch.flip(rc_seq_1hot, dims=[-1])
             
-            # Create a random boolean tensor to decide whether to reverse, shape: (batch_size,)
+            # Create a random boolean tensor for batch decision (batch_size,)
             reverse_bool = torch.rand(seq_1hot.size(0), device=device) > 0.5
             
-            # Expand reverse_bool to match the shape of seq_1hot (batch_size, 1, 1)
-            reverse_bool = reverse_bool.unsqueeze(1).unsqueeze(2)
-            
-            # Expand reverse_bool across the channels (dim 1) and sequence length (dim 2)
-            reverse_bool = reverse_bool.expand(-1, seq_1hot.size(1), seq_1hot.size(2))
-            
-            # Conditionally return the reversed complement sequence based on reverse_bool
-            result = torch.where(reverse_bool, rc_seq_1hot, seq_1hot)
+            # Use reverse_bool to select between original and reversed sequence
+            result = torch.where(reverse_bool[:, None, None], rc_seq_1hot, seq_1hot)
         else:
-            # If not training, no need to stochastically reverse, return seq_1hot unchanged
+            # In eval mode, keep the sequence unchanged
             result = seq_1hot
             reverse_bool = torch.zeros(seq_1hot.size(0), device=device, dtype=torch.bool)
         
-        # Return both the sequence and the reverse boolean flag
+        # Return both the modified sequence and the reverse decision flag
         return result, reverse_bool
 
 
@@ -71,31 +56,44 @@ class StochasticShift(nn.Module):
         super(StochasticShift, self).__init__()
         self.shift_max = shift_max
         self.symmetric = symmetric
+        # Create a tensor of all possible shift values
         if self.symmetric:
-            self.augment_shifts = torch.arange(-self.shift_max, self.shift_max + 1)
+            self.augment_shifts = torch.arange(-self.shift_max, self.shift_max + 1)  # Including 0
         else:
-            self.augment_shifts = torch.arange(0, self.shift_max + 1)
+            self.augment_shifts = torch.arange(0, self.shift_max + 1)  # Only positive shifts
         self.pad = pad
 
     def shift_sequence(self, seq_1hot, shift):
+        """
+        Applies a shift to a sequence by padding and slicing accordingly.
+        """
         if shift > 0:
-            seq_1hot_padded = F.pad(seq_1hot, (0, 0, shift, 0), mode=self.pad)
-            shifted_seq_1hot = seq_1hot_padded[:, :-shift, :]
+            seq_1hot_padded = F.pad(seq_1hot, (0, shift, 0, 0), mode=self.pad)  # Pad at the beginning
+            shifted_seq_1hot = seq_1hot_padded[:, shift:]  # Remove the extra part at the end
+        elif shift < 0:
+            seq_1hot_padded = F.pad(seq_1hot, (-shift, 0, 0, 0), mode=self.pad)  # Pad at the end
+            shifted_seq_1hot = seq_1hot_padded[:, :shift]  # Remove the extra part at the beginning
         else:
-            seq_1hot_padded = F.pad(seq_1hot, (0, 0, 0, -shift), mode=self.pad)
-            shifted_seq_1hot = seq_1hot_padded[:, -shift:, :]
+            shifted_seq_1hot = seq_1hot  # No shift if shift == 0
         return shifted_seq_1hot
 
     def forward(self, seq_1hot):
+        """
+        Applies a random shift to the input sequence during training, or returns the sequence unchanged during inference.
+        """
         if self.training:
             device = seq_1hot.device  # Ensure tensors match device
             self.augment_shifts = self.augment_shifts.to(device)  # Move augment_shifts to the same device
-            shift_i = torch.randint(len(self.augment_shifts), size=(1,), device=device)
-            shift = self.augment_shifts[shift_i]
-            sseq_1hot = torch.where(shift != 0,
-                                    self.shift_sequence(seq_1hot, shift),
-                                    seq_1hot)
-            return sseq_1hot
+            
+            # Pick a random shift for each sequence in the batch
+            shift_indices = torch.randint(len(self.augment_shifts), size=(seq_1hot.size(0),), device=device)
+            shifts = self.augment_shifts[shift_indices]  # A batch of random shift values
+            
+            # Apply the shift to each sequence in the batch
+            shifted_seq_1hot = torch.stack([
+                self.shift_sequence(seq_1hot[i], shifts[i]) for i in range(seq_1hot.size(0))
+            ])
+            return shifted_seq_1hot
         else:
             return seq_1hot
 
@@ -108,13 +106,13 @@ class ConvBlock(nn.Module):
         # Convolution Layer
         self.conv = nn.Conv1d(in_channels, filters, kernel_size, stride=stride, padding=(kernel_size // 2), dilation=dilation_rate, bias=False)
 
-        # Initialize weights to match TensorFlow
-        init.kaiming_normal_(self.conv.weight, mode='fan_out', nonlinearity='relu')
-
         # Both in pytorch and tensorflow, gammas (weights) are initialized as 1s and betas (biases) as 0s, by default.
         # Batch Normalization
         self.batch_norm = nn.BatchNorm1d(filters, eps=0.001, momentum=bn_momentum) if norm_type == 'batch' else None
 
+        # group normalization
+        self.group_norm = nn.GroupNorm(num_groups=32, num_channels=filters, eps=0.001) if norm_type == 'group' else None
+        
         # Pooling (MaxPool)
         self.pool = nn.MaxPool1d(pool_size) if pool_type == 'max' else None
 
@@ -128,6 +126,9 @@ class ConvBlock(nn.Module):
         # Apply Batch Normalization if specified
         if self.batch_norm:
             x = self.batch_norm(x)
+        
+        if self.group_norm:
+            x = self.group_norm(x)
         
         # Apply pooling if specified
         if self.pool:
@@ -163,7 +164,9 @@ class ConvTower(nn.Module):
             # Normalization
             if norm_type == "batch":
                 layers.append(nn.BatchNorm1d(int(filters), eps=0.001, momentum=bn_momentum))
-
+            elif norm_type == "group":
+                layers.append(nn.GroupNorm(num_groups=32, num_channels=int(filters), eps=0.001))
+                
             # Pooling
             layers.append(nn.MaxPool1d(kernel_size=pool_size))
 
@@ -177,20 +180,31 @@ class ConvTower(nn.Module):
 
 
 class ResidualDilatedBlock1D(nn.Module):
-    def __init__(self, in_channels, mid_channels, dropout_rate=0.4, dilation_rate=1, bn_momentum=0.0735):
+    def __init__(self, in_channels, mid_channels, dropout_rate=0.4, dilation_rate=1, bn_momentum=0.0735, norm_type='batch'):
         super(ResidualDilatedBlock1D, self).__init__()
         self.relu1 = nn.ReLU()
         self.conv1 = nn.Conv1d(
             in_channels, mid_channels, kernel_size=3, padding=dilation_rate, dilation=dilation_rate, bias=False
         )
-        self.bn1 = nn.BatchNorm1d(mid_channels, eps=0.001, momentum=bn_momentum)
+        if norm_type == 'batch':
+            self.norm1 = nn.BatchNorm1d(mid_channels, eps=0.001, momentum=bn_momentum)
+        elif norm_type == 'group':
+            num_groups = mid_channels // 2
+            self.norm1 = nn.GroupNorm(num_groups=num_groups, num_channels=mid_channels, eps=0.001)
+        else:
+            self.norm1 = None
         
         self.relu2 = nn.ReLU()
         self.conv2 = nn.Conv1d(
             mid_channels, in_channels, kernel_size=1, padding=0, bias=False
         )
-        self.bn2 = nn.BatchNorm1d(in_channels, eps=0.001, momentum=bn_momentum)
-        nn.init.constant_(self.bn2.weight, 0.0) #gammas initialized to 0s
+        if norm_type == 'batch':
+            self.norm2 = nn.BatchNorm1d(in_channels, eps=0.001, momentum=bn_momentum)
+        elif norm_type == 'group':
+            num_groups = in_channels // 2
+            self.norm2 = nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=0.001)
+        else:
+            self.norm2 = None  # No normalization if norm_type is None or unsupported value
         
         self.dropout = nn.Dropout(dropout_rate)
         
@@ -198,11 +212,13 @@ class ResidualDilatedBlock1D(nn.Module):
         residual = x
         out = self.relu1(x)
         out = self.conv1(out)
-        out = self.bn1(out)
+        if self.norm1:
+            out = self.norm1(out)
         
         out = self.relu2(out)
         out = self.conv2(out)
-        out = self.bn2(out)
+        if self.norm2:
+            out = self.norm2(out)
         
         out = self.dropout(out)
         out += residual
@@ -211,9 +227,10 @@ class ResidualDilatedBlock1D(nn.Module):
 
 
 class ConvBlockReduce(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=5, bn_momentum=0.0735):
+    def __init__(self, in_channels, out_channels, kernel_size=5, bn_momentum=0.0735, norm_type='batch', num_groups=32):
         super(ConvBlockReduce, self).__init__()
-        self.layers = nn.Sequential(
+        
+        layers = [
             nn.ReLU(),
             nn.Conv1d(
                 in_channels=in_channels,
@@ -222,10 +239,16 @@ class ConvBlockReduce(nn.Module):
                 stride=1,
                 padding=kernel_size // 2,  # To preserve sequence length
                 bias=False
-            ),
-            nn.BatchNorm1d(out_channels, eps=0.001, momentum=bn_momentum),
-            nn.ReLU()
-        )
+            )
+        ]
+        
+        if norm_type == 'batch':
+            layers.append(nn.BatchNorm1d(out_channels, eps=0.001, momentum=bn_momentum))
+        elif norm_type == 'group':
+            layers.append(nn.GroupNorm(num_groups=num_groups, num_channels=out_channels, eps=0.001))
+        
+        layers.append(nn.ReLU())
+        self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.layers(x)
@@ -291,13 +314,20 @@ class ConcatDist2D(nn.Module):
 
 
 class Conv2DBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, bn_momentum=0.0735):
+    def __init__(self, in_channels, out_channels, kernel_size=3, bn_momentum=0.0735, norm_type='batch'):
         super(Conv2DBlock, self).__init__()
-        self.block = nn.Sequential(
+        layers = [
             nn.ReLU(),
-            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2, bias=False),
-            nn.BatchNorm2d(out_channels, eps=0.001, momentum=bn_momentum)
-        )
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
+        ]
+        
+        if norm_type == 'batch':
+            layers.append(nn.BatchNorm2d(out_channels, eps=0.001, momentum=bn_momentum))
+        elif norm_type == 'group':
+            num_groups = out_channels // 2
+            layers.append(nn.GroupNorm(num_groups=num_groups, num_channels=out_channels, eps=0.001))
+        
+        self.block = nn.Sequential(*layers)
     
     def forward(self, x):
         return self.block(x)
@@ -317,7 +347,8 @@ class Symmetrize2D(nn.Module):
 
 
 class DilatedResidualBlock2D(nn.Module):
-    def __init__(self, in_channels=48, mid_channels=24, kernel_size=3, dilation_rate=1, dropout_prob=0.1, bn_momentum=0.0735):
+    def __init__(self, in_channels=48, mid_channels=24, kernel_size=3, dilation_rate=1, dropout_prob=0.1, bn_momentum=0.0735,
+                 norm_type='batch'):
         """
         A dilated residual block with symmetry enforcement.
         Args:
@@ -339,7 +370,13 @@ class DilatedResidualBlock2D(nn.Module):
             dilation=dilation_rate,  # Add dilation
             bias=False
         )
-        self.bn1 = nn.BatchNorm2d(mid_channels, eps=0.001, momentum = bn_momentum)
+        if norm_type == 'batch':
+            self.norm1 = nn.BatchNorm2d(mid_channels, eps=0.001, momentum=bn_momentum)
+        elif norm_type == 'group':
+            num_groups = mid_channels // 2
+            self.norm1 = nn.GroupNorm(num_groups=num_groups, num_channels=mid_channels, eps=0.001)
+        else:
+            self.norm1 = None  # No normalization if norm_type is None or unsupported value
 
         # Second convolutional layer (restores original channel count)
         self.conv2 = nn.Conv2d(
@@ -350,8 +387,13 @@ class DilatedResidualBlock2D(nn.Module):
             dilation=dilation_rate,  # Add dilation
             bias=False
         )
-        self.bn2 = nn.BatchNorm2d(in_channels, eps=0.001, momentum = bn_momentum)
-        nn.init.constant_(self.bn2.weight, 0.0) #gammas initialized to 0s
+        if norm_type == 'batch':
+            self.norm2 = nn.BatchNorm2d(in_channels, eps=0.001, momentum=bn_momentum)
+        elif norm_type == 'group':
+            num_groups = in_channels // 2
+            self.norm2 = nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=0.001)
+        else:
+            self.norm2 = None
         
         self.dropout = nn.Dropout2d(p=dropout_prob)
 
@@ -365,12 +407,14 @@ class DilatedResidualBlock2D(nn.Module):
         # First convolutional block
         x = self.relu(x)
         x = self.conv1(x)
-        x = self.bn1(x)
+        if self.norm1:
+            x = self.norm1(x)
 
         # Second convolutional block
         x = self.relu(x)
         x = self.conv2(x)
-        x = self.bn2(x)
+        if self.norm2:
+            x = self.norm2(x)
         
         # Dropout
         x = self.dropout(x)
@@ -401,25 +445,36 @@ class UpperTri(nn.Module):
         super(UpperTri, self).__init__()
         self.diagonal_offset = diagonal_offset
 
-    def forward(self, inputs):
-        # Get the batch size, output_dim, and seq_len from the shape of the input tensor
-        batch_size, output_dim, seq_len, _ = inputs.shape
+    def forward(self, inputs, reverse_complement_flags):
+        # Get the batch size, features_dim, and mat_size from the shape of the input tensor
+        batch_size, features_dim, mat_size, _ = inputs.shape
         
-        # Generate the upper triangular indices
-        triu_tup = torch.triu_indices(seq_len, seq_len, self.diagonal_offset)
+        # Generate the upper triangular indices with the specified diagonal offset
+        triu_tup = torch.triu_indices(mat_size, mat_size, self.diagonal_offset)
 
-        # Flatten the input tensor to shape [batch_size, output_dim, seq_len^2]
-        unroll_repr = inputs.reshape(batch_size, output_dim, seq_len * seq_len)  # Use .reshape() instead of .view()
+        # Flatten the input tensor to shape [batch_size, features_dim, mat_size^2]
+        unroll_repr = inputs.reshape(batch_size, features_dim, mat_size * mat_size)
         
-        # Move triu_index to the same device as the input tensor
-        triu_index = triu_tup[0] * seq_len + triu_tup[1]
-        triu_index = triu_index.to(unroll_repr.device)  # Make sure it is on the same device
+        # Convert triu indices to flattened indices
+        triu_index = triu_tup[0] * mat_size + triu_tup[1]  # Row * mat_size + col
+        triu_index = triu_index.to(inputs.device)
         
-        # Unsqueeze triu_index to make it [seq_len^2] and expand it across all the batch examples and channels
-        triu_index = triu_index.unsqueeze(0).unsqueeze(0).expand(batch_size, output_dim, -1)
+        # Unsqueeze triu_index to make it [mat_size^2] and expand it across all the batch examples and channels
+        triu_index = triu_index.unsqueeze(0).unsqueeze(0).expand(batch_size, features_dim, -1)
 
-        # Select the upper triangular part for each example in the batch, across all channels
-        return torch.gather(unroll_repr, 2, triu_index)
+        # Generate the flipped version of the input by rotating along the main diagonal
+        flipped_repr = unroll_repr.flip(2)  # Flip along the flattened matrix rows
+
+        unroll_repr = unroll_repr.to(inputs.device)
+        flipped_repr = flipped_repr.to(inputs.device)  
+        reverse_complement_flags = reverse_complement_flags.to(inputs.device)
+        
+        # Use reverse_complement_flags to select between original and flipped maps
+        upper_tri = torch.where(reverse_complement_flags.view(batch_size, 1, 1).expand(batch_size, features_dim, -1),
+                                torch.gather(unroll_repr, 2, triu_index),
+                                torch.gather(flipped_repr, 2, triu_index))
+
+        return upper_tri
 
 
 class Final(nn.Module):
@@ -434,17 +489,12 @@ class Final(nn.Module):
         self.dense = nn.Linear(in_features=48, out_features=self.units) #, bias=True)  # Transform channels (seq_len) only
 
     def forward(self, x):
+        # x dim: batch_size, feature_dim, seq_length
+        
+        # Apply the dense layer along the feature_dim (which will transform it to num_units)
+        x = self.dense(x.transpose(1, 2))
 
-        # Get batch size, seq_len, and feature_dim
-        batch_size, seq_len, feature_dim = x.shape
-
-        # Transpose to make seq_len the last dimension: [batch_size, feature_dim, seq_len]
-        x = x.transpose(1, 2)
-
-        # Apply the dense layer along seq_len (last dimension)
-        x = self.dense(x)  # Shape becomes [batch_size, feature_dim, new_seq_len]
-
-        # Transpose back to [batch_size, new_seq_len, feature_dim]
+        # Transpose back to [batch_size, num_units, seq_length]
         x = x.transpose(1, 2)
 
         # Apply activation function
@@ -467,42 +517,42 @@ class Final(nn.Module):
         return x
 
 
-class SwitchReverseTriu(nn.Module):
-    def __init__(self, diagonal_offset, matrix_size):
-        """
-        Args:
-            diagonal_offset (int): Offset for the diagonal in the upper triangular matrix.
-            matrix_size (int): Size of the square matrix (e.g., 448 for 448x448).
-        """
-        super(SwitchReverseTriu, self).__init__()
-        self.diagonal_offset = diagonal_offset
-        self.matrix_size = matrix_size  # Square matrix size
-        self.ut_len = (matrix_size * (matrix_size + 1)) // 2  # Total upper triangular elements
+# class SwitchReverseTriu(nn.Module):
+#     def __init__(self, diagonal_offset, matrix_size):
+#         """
+#         Args:
+#             diagonal_offset (int): Offset for the diagonal in the upper triangular matrix.
+#             matrix_size (int): Size of the square matrix (e.g., 448 for 448x448).
+#         """
+#         super(SwitchReverseTriu, self).__init__()
+    #     self.diagonal_offset = diagonal_offset
+    #     self.matrix_size = matrix_size  # Square matrix size
+    #     self.ut_len = (matrix_size * (matrix_size + 1)) // 2  # Total upper triangular elements
 
-    def forward(self, x, reverse_bool):
-        """
-        Forward pass with optional reversal of the upper triangular indices.
+    # def forward(self, x, reverse_bool):
+    #     """
+    #     Forward pass with optional reversal of the upper triangular indices.
 
-        Args:
-            x (Tensor): Input tensor with shape [batch_size, channels, ut_len].
-            reverse_bool (Tensor): Boolean tensor of shape [batch_size] indicating reversal.
+    #     Args:
+    #         x (Tensor): Input tensor with shape [batch_size, channels, ut_len].
+    #         reverse_bool (Tensor): Boolean tensor of shape [batch_size] indicating reversal.
 
-        Returns:
-            Tensor: Processed tensor with the same shape as input.
-        """
-        batch_size, channels, length = x.size()
+    #     Returns:
+    #         Tensor: Processed tensor with the same shape as input.
+    #     """
+    #     batch_size, channels, length = x.size()
 
-        # Get upper triangular indices for the matrix
-        ut_indices = torch.triu_indices(self.matrix_size, self.matrix_size, self.diagonal_offset).to(x.device)
+    #     # Get upper triangular indices for the matrix
+    #     ut_indices = torch.triu_indices(self.matrix_size, self.matrix_size, self.diagonal_offset).to(x.device)
 
-        # Flip the elements in the upper triangle based on reverse_bool
-        if reverse_bool.any():
-            # Reverse the triangular elements (swap upper triangle elements)
-            for b in range(batch_size):
-                if reverse_bool[b]:
-                    # Get the elements for the upper triangle in the current batch
-                    upper_triangle = x[b, :, :]  # [channels, ut_len]
-                    flipped = torch.flip(upper_triangle, dims=[1])  # Flip along the last dimension (upper triangle)
-                    x[b, :, :] = flipped
+    #     # Flip the elements in the upper triangle based on reverse_bool
+    #     if reverse_bool.any():
+    #         # Reverse the triangular elements (swap upper triangle elements)
+    #         for b in range(batch_size):
+    #             if reverse_bool[b]:
+    #                 # Get the elements for the upper triangle in the current batch
+    #                 upper_triangle = x[b, :, :]  # [channels, ut_len]
+    #                 flipped = torch.flip(upper_triangle, dims=[1])  # Flip along the last dimension (upper triangle)
+    #                 x[b, :, :] = flipped
 
-        return x
+    #     return x

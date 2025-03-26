@@ -23,6 +23,7 @@ LR=0.001
 EARLY_STOP=15
 LOG_INTERVAL=200
 SAVE_MODEL_PATH="/scratch1/smaruj/train_pytorch_akita/mouse_models/model_0_reference.pt"
+SAVE_LOSSES_PATH="./reference_model_losses.csv"
 
 python train_model.py \
     --data_dir "$DATA_DIR" \
@@ -34,4 +35,5 @@ python train_model.py \
     --early-stop-patience "$EARLY_STOP" \
     --log-interval "$LOG_INTERVAL" \
     --save-model \
-    --save-model-path "$SAVE_MODEL_PATH"
+    --save-model-path "$SAVE_MODEL_PATH" \
+    --save-losses "$SAVE_LOSSES_PATH"

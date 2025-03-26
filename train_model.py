@@ -1,22 +1,14 @@
 import argparse
 import torch
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
 
 import csv
+import os
 
 from model import SeqNN
 
 import schedulefree
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-from tqdm import tqdm
-import os
-import logging
-from model import SeqNN
 
 
 class HiCDataset(Dataset):
@@ -155,6 +147,8 @@ def main():
                         help='For Saving the current Model')
     parser.add_argument('--save-model-path', type=str, default="./",
                         help='Path for Saving the current Model')
+    parser.add_argument('--save-losses', type=str, default="./losses.csv",
+                    help='Path for Saving train and valid losses')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     
@@ -216,7 +210,7 @@ def main():
             break
     
     # Save losses to a CSV file after training
-    with open('losses.csv', 'w', newline='') as f:
+    with open(args.save_losses, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['Epoch', 'Train Loss', 'Validation Loss'])
         writer.writerows(loss_data)
