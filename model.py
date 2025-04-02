@@ -65,7 +65,7 @@ class SeqNN(nn.Module):
             mid_channels=48,
             dropout_rate=0.4,
             dilation_rate=1,
-            norm_type="batch"
+            norm_type='batch'
         )
         
         self.residual1d_block2 = ResidualDilatedBlock1D(
@@ -73,7 +73,7 @@ class SeqNN(nn.Module):
             mid_channels=48,
             dropout_rate=0.4,
             dilation_rate=2,
-            norm_type="batch"
+            norm_type='batch'
         )
         
         self.residual1d_block3 = ResidualDilatedBlock1D(
@@ -81,7 +81,7 @@ class SeqNN(nn.Module):
             mid_channels=48,
             dropout_rate=0.4,
             dilation_rate=4,
-            norm_type="batch"
+            norm_type='batch'
         )
         
         self.residual1d_block4 = ResidualDilatedBlock1D(
@@ -89,7 +89,7 @@ class SeqNN(nn.Module):
             mid_channels=48,
             dropout_rate=0.4,
             dilation_rate=7,
-            norm_type="batch"
+            norm_type='batch'
         )
         
         self.residual1d_block5 = ResidualDilatedBlock1D(
@@ -97,7 +97,7 @@ class SeqNN(nn.Module):
             mid_channels=48,
             dropout_rate=0.4,
             dilation_rate=12,
-            norm_type="batch"
+            norm_type='batch'
         )
         
         self.residual1d_block6 = ResidualDilatedBlock1D(
@@ -105,7 +105,7 @@ class SeqNN(nn.Module):
             mid_channels=48,
             dropout_rate=0.4,
             dilation_rate=21,
-            norm_type="batch"
+            norm_type='batch'
         )
         
         self.residual1d_block7 = ResidualDilatedBlock1D(
@@ -113,7 +113,7 @@ class SeqNN(nn.Module):
             mid_channels=48,
             dropout_rate=0.4,
             dilation_rate=37,
-            norm_type="batch"
+            norm_type='batch'
         )
         
         self.residual1d_block8 = ResidualDilatedBlock1D(
@@ -121,7 +121,7 @@ class SeqNN(nn.Module):
             mid_channels=48,
             dropout_rate=0.4,
             dilation_rate=65,
-            norm_type="batch"
+            norm_type='batch'
         )
         
         # ConvBlockReduce
@@ -130,7 +130,7 @@ class SeqNN(nn.Module):
             out_channels=64,
             kernel_size=5,
             bn_momentum=0.0735,
-            norm_type="batch"
+            norm_type='batch'
         )
         
         # HEAD
@@ -146,7 +146,7 @@ class SeqNN(nn.Module):
             in_channels=65, 
             out_channels=48, 
             kernel_size=3,
-            norm_type="batch")
+            norm_type='batch')
         
         # Symmetrize2D
         self.symmetrize_2d = Symmetrize2D()
@@ -158,7 +158,7 @@ class SeqNN(nn.Module):
             kernel_size=3, 
             dilation_rate=1,
             dropout_prob=0.1,
-            norm_type="batch")
+            norm_type='batch')
         
         self.residual2d_block2 = DilatedResidualBlock2D(
             in_channels=48, 
@@ -166,7 +166,7 @@ class SeqNN(nn.Module):
             kernel_size=3, 
             dilation_rate=2,
             dropout_prob=0.1,
-            norm_type="batch")
+            norm_type='batch')
         
         self.residual2d_block3 = DilatedResidualBlock2D(
             in_channels=48, 
@@ -174,7 +174,7 @@ class SeqNN(nn.Module):
             kernel_size=3, 
             dilation_rate=4,
             dropout_prob=0.1,
-            norm_type="batch")
+            norm_type='batch')
         
         self.residual2d_block4 = DilatedResidualBlock2D(
             in_channels=48, 
@@ -182,7 +182,7 @@ class SeqNN(nn.Module):
             kernel_size=3, 
             dilation_rate=7,
             dropout_prob=0.1,
-            norm_type="batch")
+            norm_type='batch')
         
         self.residual2d_block5 = DilatedResidualBlock2D(
             in_channels=48, 
@@ -190,7 +190,7 @@ class SeqNN(nn.Module):
             kernel_size=3, 
             dilation_rate=12,
             dropout_prob=0.1,
-            norm_type="batch")
+            norm_type='batch')
         
         self.residual2d_block6 = DilatedResidualBlock2D(
             in_channels=48, 
@@ -198,14 +198,14 @@ class SeqNN(nn.Module):
             kernel_size=3, 
             dilation_rate=21,
             dropout_prob=0.1,
-            norm_type="batch")
+            norm_type='batch')
         
         # Cropping2D
         # self.cropping_2d = Cropping2D(cropping=32)
         self.cropping_2d = Cropping2D(cropping=64)
         
         # UpperTri
-        self.upper_tri = UpperTri()
+        self.upper_tri = UpperTri(diagonal_offset=2)
         
         # Final
         self.final = Final(units=1, activation='linear')
@@ -263,8 +263,10 @@ class SeqNN(nn.Module):
         x = self.cropping_2d(x)
         
         # UpperTri
+        # x = self.upper_tri(x)
         x = self.upper_tri(x, reverse_bool)
         
+        # Add reversing matrices        
         x = self.final(x)
         
         return x

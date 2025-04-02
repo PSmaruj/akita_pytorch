@@ -112,8 +112,8 @@ def generate_and_save_dataset(df, genome, genome_hic_cool, output_dir, fold=0):
         ohe_tensor = torch.tensor(ohe_sequence, dtype=torch.float32)
         hic_tensor = torch.tensor(hic_vector, dtype=torch.float32)
 
-        ohe_tensor = ohe_tensor.squeeze(0) # sequence of shape [4, 1048576]
-        hic_tensor = hic_tensor.unsqueeze(0) # vector of shape [1, 99681]
+        ohe_tensor = ohe_tensor.squeeze(0)
+        hic_tensor = hic_tensor.unsqueeze(0)
         
         data_list.append((ohe_tensor, hic_tensor))
 

@@ -2,6 +2,7 @@ import argparse
 import torch
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
+from fvcore.nn.precise_bn import update_bn_stats
 
 import csv
 import os
@@ -43,7 +44,7 @@ class HiCDataset(Dataset):
         return ohe_sequence, hic_vector
 
 
-def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_val_loss, epochs_no_improve, save_model=False, save_model_path=None):
+def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_val_loss, epochs_no_improve, weight_clip_value, save_model=False, save_model_path=None):
     model.train()
     optimizer.train()
     
@@ -59,6 +60,10 @@ def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_
         loss.backward()
         optimizer.step()
 
+        # Apply weight clipping
+        for param in model.parameters():
+            param.data.clamp_(-weight_clip_value, weight_clip_value)
+        
         train_loss += loss.item()  # SUM of batch losses
         num_batches += 1
 
@@ -71,6 +76,11 @@ def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_
 
     # Normalize to get the mean loss
     train_loss /= num_batches    
+    
+    # # Apply Precise BatchNorm Updates
+    # print("Updating BatchNorm statistics with preciseBP...")
+    # # update_bn_stats(model, (data.to(device) for data, _ in train_loader), num_iters=len(train_loader))
+    # update_bn_stats(model, (data.to(device) for data, _ in train_loader), num_iters=200)
     
     model.eval()
     val_loss = 0
@@ -133,7 +143,13 @@ def main():
                         help='number of epochs to train (default: 200)')
     parser.add_argument('--lr', type=float, default=0.0025, metavar='LR',
                         help='learning rate (default: 0.0025)')
-    parser.add_argument('--early-stop-patience', type=int, default=15,
+    parser.add_argument('--optimizer', type=str, default="adam", choices=["adam", "sgd"],
+                        help='Choose optimizer: "adam" (default) or "sgd"')
+    parser.add_argument('--momentum', type=float, default=0.99575,
+                        help='Momentum value for SGD optimizer (default: 0.99575). Ignored if using Adam.')
+    parser.add_argument('--weight-clipping', type=float, default=10.0,
+                        help='')
+    parser.add_argument('--early-stop-patience', type=int, default=8,
                     help='Stop training if validation loss does not improve for this many epochs')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
@@ -189,7 +205,12 @@ def main():
     # test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
     
     model = SeqNN().to(device)
-    optimizer = schedulefree.AdamWScheduleFree(model.parameters(), lr=args.lr)
+    
+    # Select optimizer
+    if args.optimizer == "adam":
+        optimizer = schedulefree.AdamWScheduleFree(model.parameters(), lr=args.lr)
+    elif args.optimizer == "sgd":
+        optimizer = schedulefree.SGDScheduleFree(model.parameters(), lr=args.lr, momentum=args.momentum)
 
     best_val_loss = float('inf')
     epochs_no_improve = 0
@@ -200,6 +221,7 @@ def main():
     for epoch in range(1, args.epochs + 1):
         train_loss, val_loss, best_val_loss, epochs_no_improve = train(args, model, device, train_loader, valid_loader,
                                                  optimizer, epoch, best_val_loss, epochs_no_improve,
+                                                 weight_clip_value=args.weight_clipping, 
                                                  save_model=args.save_model, save_model_path=args.save_model_path)
         
         # Save training and validation losses for each epoch
