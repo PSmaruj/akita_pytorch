@@ -18,6 +18,7 @@ class HiCDataset(Dataset):
         
         # Load and process the data files
         for file in data_files:
+            print("Loading file:", file)
             file_data = torch.load(file, weights_only=True)
             
             for data in file_data:
@@ -78,9 +79,9 @@ def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_
     train_loss /= num_batches    
     
     # # Apply Precise BatchNorm Updates
-    # print("Updating BatchNorm statistics with preciseBP...")
+    print("Updating BatchNorm statistics with preciseBP...")
     # # update_bn_stats(model, (data.to(device) for data, _ in train_loader), num_iters=len(train_loader))
-    # update_bn_stats(model, (data.to(device) for data, _ in train_loader), num_iters=200)
+    update_bn_stats(model, (data.to(device) for data, _ in train_loader), num_iters=200)
     
     model.eval()
     val_loss = 0
@@ -204,7 +205,12 @@ def main():
     valid_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
     # test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
     
-    model = SeqNN().to(device)
+    # model = SeqNN().to(device)
+    model = SeqNN()
+    if use_cuda and torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs")
+        model = torch.nn.DataParallel(model)
+    model = model.to(device)
     
     # Select optimizer
     if args.optimizer == "adam":

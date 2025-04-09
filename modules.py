@@ -596,7 +596,7 @@ class Final(nn.Module):
         x = self.dense(x.transpose(1, 2))
 
         # Transpose back to [batch_size, num_units, seq_length]
-        # x = x.transpose(1, 2)
+        x = x.transpose(1, 2)
 
         # Apply activation function
         if self.activation == 'relu':
