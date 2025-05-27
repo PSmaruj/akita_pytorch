@@ -128,8 +128,8 @@ class ConvBlock(nn.Module):
         if self.batch_norm:
             x = self.batch_norm(x)
         
-        if self.group_norm:
-            x = self.group_norm(x)
+        # if self.group_norm:
+        #     x = self.group_norm(x)
         
         # Apply pooling if specified
         if self.pool:
@@ -618,42 +618,42 @@ class Final(nn.Module):
         return x
 
 
-# class SwitchReverseTriu(nn.Module):
-#     def __init__(self, diagonal_offset, matrix_size):
-#         """
-#         Args:
-#             diagonal_offset (int): Offset for the diagonal in the upper triangular matrix.
-#             matrix_size (int): Size of the square matrix (e.g., 448 for 448x448).
-#         """
-#         super(SwitchReverseTriu, self).__init__()
-    #     self.diagonal_offset = diagonal_offset
-    #     self.matrix_size = matrix_size  # Square matrix size
-    #     self.ut_len = (matrix_size * (matrix_size + 1)) // 2  # Total upper triangular elements
+class SwitchReverseTriu(nn.Module):
+    def __init__(self, diagonal_offset, matrix_size):
+        """
+        Args:
+            diagonal_offset (int): Offset for the diagonal in the upper triangular matrix.
+            matrix_size (int): Size of the square matrix (e.g., 448 for 448x448).
+        """
+        super(SwitchReverseTriu, self).__init__()
+        self.diagonal_offset = diagonal_offset
+        self.matrix_size = matrix_size  # Square matrix size
+        self.ut_len = (matrix_size * (matrix_size + 1)) // 2  # Total upper triangular elements
 
-    # def forward(self, x, reverse_bool):
-    #     """
-    #     Forward pass with optional reversal of the upper triangular indices.
+    def forward(self, x, reverse_bool):
+        """
+        Forward pass with optional reversal of the upper triangular indices.
 
-    #     Args:
-    #         x (Tensor): Input tensor with shape [batch_size, channels, ut_len].
-    #         reverse_bool (Tensor): Boolean tensor of shape [batch_size] indicating reversal.
+        Args:
+            x (Tensor): Input tensor with shape [batch_size, channels, ut_len].
+            reverse_bool (Tensor): Boolean tensor of shape [batch_size] indicating reversal.
 
-    #     Returns:
-    #         Tensor: Processed tensor with the same shape as input.
-    #     """
-    #     batch_size, channels, length = x.size()
+        Returns:
+            Tensor: Processed tensor with the same shape as input.
+        """
+        batch_size, channels, length = x.size()
 
-    #     # Get upper triangular indices for the matrix
-    #     ut_indices = torch.triu_indices(self.matrix_size, self.matrix_size, self.diagonal_offset).to(x.device)
+        # Get upper triangular indices for the matrix
+        ut_indices = torch.triu_indices(self.matrix_size, self.matrix_size, self.diagonal_offset).to(x.device)
 
-    #     # Flip the elements in the upper triangle based on reverse_bool
-    #     if reverse_bool.any():
-    #         # Reverse the triangular elements (swap upper triangle elements)
-    #         for b in range(batch_size):
-    #             if reverse_bool[b]:
-    #                 # Get the elements for the upper triangle in the current batch
-    #                 upper_triangle = x[b, :, :]  # [channels, ut_len]
-    #                 flipped = torch.flip(upper_triangle, dims=[1])  # Flip along the last dimension (upper triangle)
-    #                 x[b, :, :] = flipped
+        # Flip the elements in the upper triangle based on reverse_bool
+        if reverse_bool.any():
+            # Reverse the triangular elements (swap upper triangle elements)
+            for b in range(batch_size):
+                if reverse_bool[b]:
+                    # Get the elements for the upper triangle in the current batch
+                    upper_triangle = x[b, :, :]  # [channels, ut_len]
+                    flipped = torch.flip(upper_triangle, dims=[1])  # Flip along the last dimension (upper triangle)
+                    x[b, :, :] = flipped
 
-    #     return x
+        return x

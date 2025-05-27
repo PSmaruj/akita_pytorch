@@ -8,8 +8,8 @@ import csv
 import os
 
 # from model import SeqNN
-# from model_v2_compatible import SeqNN
-from model_v2_horiz_checkpoint import SeqNN
+from model_v2_compatible import SeqNN
+# from model_v2_horiz_checkpoint import SeqNN
 
 import schedulefree
 
@@ -20,6 +20,7 @@ class HiCDataset(Dataset):
         
         # Load and process the data files
         for file in data_files:
+            print("Loading file:", file)
             file_data = torch.load(file, weights_only=True)
             
             for data in file_data:
@@ -44,6 +45,11 @@ class HiCDataset(Dataset):
         # Fetch the preprocessed (ohe_sequence, hic_vector) pair from memory
         ohe_sequence, hic_vector = self.data[idx]
         return ohe_sequence, hic_vector
+
+
+def data_loader_for_precise_bn(loader, device):
+    for data, _ in loader:
+        yield data.to(device)
 
 
 def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_val_loss, epochs_no_improve, weight_clip_value, save_model=False, save_model_path=None, scaler=None):
@@ -90,9 +96,9 @@ def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_
     # # Apply Precise BatchNorm Updates
     print("Updating BatchNorm statistics with preciseBP...")
     # # update_bn_stats(model, (data.to(device) for data, _ in train_loader), num_iters=len(train_loader))
-    # update_bn_stats(model, (data.to(device) for data, _ in train_loader), num_iters=200)
+    update_bn_stats(model, data_loader_for_precise_bn(train_loader, device), num_iters=min(len(train_loader), 200))
     # with multiple GPUs
-    update_bn_stats(model.module, (data.to(device) for data, _ in train_loader), num_iters=200)
+    # update_bn_stats(model.module, (data.to(device) for data, _ in train_loader), num_iters=200)
     
     model.eval()
     val_loss = 0
@@ -211,6 +217,21 @@ def main():
     val_files = [f for f in all_files if args.val_fold in f]
     train_files = [f for f in all_files if args.test_fold not in f and args.val_fold not in f]
     
+    # Add background files manually
+    # background_files = [
+    #     "/scratch1/smaruj/background_generation/training_pt_files/background_fold0_0.pt",
+    #     "/scratch1/smaruj/background_generation/training_pt_files/background_fold0_1.pt",
+    #     "/scratch1/smaruj/background_generation/training_pt_files/background_fold0_2.pt"
+    # ]
+    # Add shuffled sequences manually
+    background_files = [
+        "/scratch1/smaruj/background_generation/training_shuffled_pt_files/shuffled_fold0_0.pt",
+        "/scratch1/smaruj/background_generation/training_shuffled_pt_files/shuffled_fold0_1.pt",
+        "/scratch1/smaruj/background_generation/training_shuffled_pt_files/shuffled_fold0_2.pt"
+    ]
+    
+    train_files.extend(background_files)
+    
     # for quick testing
     # train_files = [f"/scratch1/smaruj/train_pytorch_akita/mouse_data/Hsieh2019_mESC_data_local/fold2_{i}.pt" for i in range(4)]
     
@@ -223,25 +244,25 @@ def main():
     
     # differece: Akita.v2 has a parameter shuffle_buffer=128
     # Here, the entire train set is shuffled randomly at the beginning of each epoch, so it's more randomized than using shuffle_buffer
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, drop_last=True, shuffle=True, num_workers=4, pin_memory=True)
     valid_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
     # test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
     
     print("len train_loader", len(train_loader))
     print("len valid_loader", len(valid_loader))
     
-    # model = SeqNN()
+    model = SeqNN()
     # starting from loaded TF-weights
     # parameters only
-    # model = torch.load("/home1/smaruj/pytorch_akita/model_v2_mouse_model0_target0.pth").to(device)
+    model = torch.load("/home1/smaruj/pytorch_akita/model_v2_mouse_model0_target0.pth").to(device)
     # full model
     # model.load_state_dict(torch.load("/scratch1/smaruj/train_pytorch_akita/mouse_models/model_0_v2_finetuned.pt", map_location=device))
     
     # multiple GPUs
-    model = SeqNN()
-    if use_cuda and torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs")
-        model = torch.nn.DataParallel(model)
+    # model = SeqNN()
+    # if use_cuda and torch.cuda.device_count() > 1:
+    #     print(f"Using {torch.cuda.device_count()} GPUs")
+    #     model = torch.nn.DataParallel(model)
     model = model.to(device)
     
     print(f"Selected optimizer: {args.optimizer}")
@@ -252,7 +273,7 @@ def main():
         optimizer = schedulefree.SGDScheduleFree(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.l2_scale)
     
     # scaler = GradScaler()
-    scaler = torch.amp.GradScaler('cuda')
+    # scaler = torch.amp.GradScaler('cuda')
     
     best_val_loss = float('inf')
     epochs_no_improve = 0
@@ -272,7 +293,7 @@ def main():
                 optimizer, epoch, best_val_loss, epochs_no_improve,
                 weight_clip_value=args.weight_clipping, 
                 save_model=args.save_model, save_model_path=args.save_model_path,
-                scaler=scaler
+                scaler=None
             )
 
             # Append training and validation losses for the current epoch
