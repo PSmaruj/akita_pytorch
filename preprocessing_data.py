@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+import argparse
 import numpy as np
 import pandas as pd
 import torch
@@ -7,27 +9,11 @@ from astropy.convolution import Gaussian2DKernel, convolve
 from pyfaidx import Fasta
 import logging
 import random
+import os
 
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-# --- File Paths ---
-FASTA_FILE = "/project/fudenber_735/genomes/mm10/mm10.fa"
-BED_FILE = "/project/fudenber_735/tensorflow_models/akita/v2/data/mm10/sequences.bed"
-COOL_FILE = "/project/fudenber_735/GEO/Hsieh2019/4DN/mESC_mm10_4DNFILZ1CPT8.mapq_30.2048.cool"
-OUTPUT_DIR = "/scratch1/smaruj/train_pytorch_akita/mouse"
-FOLD = 0
-
-# --- Load Data ---
-genome = Fasta(FASTA_FILE)
-df = pd.read_csv(BED_FILE, sep="\t", header=None, names=["chrom", "start", "end", "fold"])
-df_select_fold = df[df["fold"] == f"fold{FOLD}"].reset_index(drop=True)
-
-genome_hic_cool = cooler.Cooler(COOL_FILE)
-
-# --- Functions ---
-import random
+# ----------------------------
+# Helper Functions
+# ----------------------------
 
 def one_hot_encode_sequence(sequence_obj):
     sequence = str(sequence_obj).upper()
@@ -95,6 +81,9 @@ def upper_triangular_to_vector_skip_diagonals(matrix, dim=512, diag=2):
 
 
 def generate_and_save_dataset(df, genome, genome_hic_cool, output_dir, fold=0):
+    
+    logging.info(f"Processing fold {fold}")
+    
     data_list = []
     file_count = 0
 
@@ -124,7 +113,30 @@ def generate_and_save_dataset(df, genome, genome_hic_cool, output_dir, fold=0):
             data_list = []
             file_count += 1
 
+# ----------------------------
+# Main
+# ----------------------------
 
-# --- Main Execution ---
 if __name__ == "__main__":
-    generate_and_save_dataset(df_select_fold, genome, genome_hic_cool, OUTPUT_DIR, fold=FOLD)
+    parser = argparse.ArgumentParser(description="Generate preprocessed PyTorch datasets from Hi-C and DNA.")
+    parser.add_argument("--cool_file", required=True, help="Path to .cool Hi-C file")
+    parser.add_argument("--output_dir", required=True, help="Directory to save output .pt files")
+    parser.add_argument("--fasta_file", required=True, help="Reference genome FASTA file")
+    parser.add_argument("--bed_file", required=True, help="Path to BED file containing regions and folds")
+    parser.add_argument("--start_fold", type=int, default=0, help="First fold index (default=0)")
+    parser.add_argument("--end_fold", type=int, default=7, help="Last fold index (default=7)")
+    args = parser.parse_args()
+
+    # Setup logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+    # Load data
+    genome = Fasta(args.fasta_file)
+    df = pd.read_csv(args.bed_file, sep="\t", header=None, names=["chrom", "start", "end", "fold"])
+    genome_hic_cool = cooler.Cooler(args.cool_file)
+
+    # Process folds
+    for fold in range(args.start_fold, args.end_fold + 1):
+        generate_and_save_dataset(df, genome, genome_hic_cool, args.output_dir, fold)
+
+    logging.info("✅ All folds processed successfully.")
