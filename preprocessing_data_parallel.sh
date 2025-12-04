@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=ORC_data
+#SBATCH --job-name=nCN_HiC
 #SBATCH --account=fudenber_735
 #SBATCH --partition=qcb
 #SBATCH --nodes=1
@@ -13,9 +13,9 @@ eval "$(conda shell.bash hook)"
 conda activate pytorch_cuda11.8
 
 # cooler
-COOL_FILE="/scratch1/smaruj/Akita_pytorch_training_data/mouse_unprocessed_data/Monahan2019_ORC/HiC_Monahan2019_ORC.mm10.mapq30.2048.cool"
+COOL_FILE="/project2/fudenber_735/GEO/bonev_2017_GSE96107/distiller-0.3.1_mm10/results/coolers/HiC_ncx_CN_all.mm10.mapq_30.2048.cool"
 
-OUTPUT_DIR="/scratch1/smaruj/Akita_pytorch_training_data/mouse_data/Monahan2019_ORC"
+OUTPUT_DIR="/scratch1/smaruj/Akita_pytorch_training_data/mouse_data/Bonev2017_ncx_CN"
 
 python preprocessing_data_parallel.py \
   --cool_file "$COOL_FILE" \
@@ -29,6 +29,7 @@ python preprocessing_data_parallel.py \
 #   --cool_file "$COOL_FILE" \
 #   --fasta_file /project2/fudenber_735/genomes/hg38/hg38.fa \
 #   --bed_file /project2/fudenber_735/tensorflow_models/akita/v2/data/hg38/sequences.bed \
-#   --gaps_file  \
+#   --gaps_file /project2/fudenber_735/backup/DNN_HiC/data_hg38/hg38.blacklist.rep.bed \
 #   --output_dir "$OUTPUT_DIR" \
 #   --num_workers 64
+  

@@ -66,20 +66,27 @@ def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
-            
+
         if scaler is not None:
             with torch.amp.autocast('cuda'):
                 output = model(data)
-                loss = F.mse_loss(output, target)
+                
+                # Create mask for valid (non-NaN) target entries
+                valid_mask = ~torch.isnan(target)
+                
+                # Compute MSE only on valid entries
+                loss = F.mse_loss(output[valid_mask], target[valid_mask])
+            
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
             output = model(data)
-            loss = F.mse_loss(output, target)
+            valid_mask = ~torch.isnan(target)
+            loss = F.mse_loss(output[valid_mask], target[valid_mask])
             loss.backward()
             optimizer.step()
-
+    
         # Apply weight clipping
         for param in model.parameters():
             param.data.clamp_(-weight_clip_value, weight_clip_value)
@@ -109,8 +116,15 @@ def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_
         for data, target in val_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            val_loss += F.mse_loss(output, target).item()
-            num_batches += 1
+            
+            # Mask NaN values
+            valid_mask = ~torch.isnan(target)
+            
+            # If there are any valid values, compute MSE only on them
+            if valid_mask.any():
+                loss = F.mse_loss(output[valid_mask], target[valid_mask])
+                val_loss += loss.item()
+                num_batches += 1
 
     val_loss /= num_batches  # Normalize by number of batches
     print(f'\nValidation set: Average MSE loss: {val_loss:.4f}\n')
@@ -215,13 +229,22 @@ def main():
     print("len train_loader", len(train_loader))
     print("len valid_loader", len(valid_loader))
     
+    torch.serialization.add_safe_globals([SeqNN])
+    
     # --- Model ---
     print(f"Loading pretrained model for {args.organism}, {args.data_name}, split {args.data_split}")
     model_path = f"/scratch1/smaruj/Akita_pytorch_models/tf_transferred/{args.organism}_models/" \
                  f"{args.data_name}/Akita_v2_{args.organism}_{args.data_name}_model{args.data_split}.pth"
 
-    model = SeqNN()
-    model = torch.load(model_path).to(device)
+    # randomly initialized top layer
+    # model_path = f"/scratch1/smaruj/Akita_pytorch_models/tf_transferred/random_dense_layer/Akita_v2_random_dense_model{args.data_split}.pth"
+
+    # model = torch.load(model_path, map_location=device)  # loads the entire SeqNN
+    # model.to(device)
+    
+    model = torch.load(model_path, map_location=device, weights_only=False)  
+    model.to(device) 
+    model.train()
 
     # Select optimizer
     print(f"Selected optimizer: {args.optimizer}")
@@ -233,8 +256,8 @@ def main():
     best_val_loss = float('inf')
     epochs_no_improve = 0
     
-    save_model_path = f"/scratch1/smaruj/Akita_pytorch_models/finetuned/{args.organism}_models/{args.data_name}/models/Akita_v2_mouse_{args.data_name}_model{args.data_split}_finetuned.pth"
-    save_losses = f"/scratch1/smaruj/Akita_pytorch_models/finetuned/{args.organism}_models/{args.data_name}/losses/Akita_v2_mouse_{args.data_name}_model{args.data_split}_finetuned.csv"
+    save_model_path = f"/scratch1/smaruj/Akita_pytorch_models/finetuned/{args.organism}_models/{args.data_name}/models/Akita_v2_{args.organism}_{args.data_name}_model{args.data_split}_finetuned.pth"
+    save_losses = f"/scratch1/smaruj/Akita_pytorch_models/finetuned/{args.organism}_models/{args.data_name}/losses/Akita_v2_{args.organism}_{args.data_name}_model{args.data_split}_finetuned.csv"
     
     # --- Training Loop ---
     file_exists = os.path.isfile(save_losses)
@@ -244,6 +267,41 @@ def main():
         # Write header only if the file is new
         if not file_exists:
             writer.writerow(['Epoch', 'Train Loss', 'Validation Loss'])
+        
+        # --- Compute initial losses before training ---
+        print("Computing initial losses before training...")
+        model.eval()
+        init_train_loss, init_val_loss = 0.0, 0.0
+        num_train_batches, num_val_batches = 0, 0
+
+        with torch.no_grad():
+            # Compute initial train loss
+            for data, target in train_loader:
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                valid_mask = ~torch.isnan(target)
+                if valid_mask.any():
+                    loss = F.mse_loss(output[valid_mask], target[valid_mask])
+                    init_train_loss += loss.item()
+                    num_train_batches += 1
+
+            init_train_loss /= max(num_train_batches, 1)
+
+            # Compute initial validation loss
+            for data, target in valid_loader:
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                valid_mask = ~torch.isnan(target)
+                if valid_mask.any():
+                    loss = F.mse_loss(output[valid_mask], target[valid_mask])
+                    init_val_loss += loss.item()
+                    num_val_batches += 1
+
+            init_val_loss /= max(num_val_batches, 1)
+
+        print(f"Initial Train Loss: {init_train_loss:.4f}, Initial Validation Loss: {init_val_loss:.4f}")
+        writer.writerow([0, init_train_loss, init_val_loss])
+        f.flush()
         
         for epoch in range(1, args.epochs + 1):
             train_loss, val_loss, best_val_loss, epochs_no_improve = train(

@@ -58,20 +58,47 @@ def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_
     train_loss = 0  # Initialize training loss
     num_batches = 0
 
+    total_train_vals = 0
+    total_train_nans = 0
+    
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
-            
+        
         if scaler is not None:
             with torch.amp.autocast('cuda'):
                 output = model(data)
-                loss = F.mse_loss(output, target)
+                
+                # Count NaNs
+                n_nans = torch.isnan(target).sum().item()
+                n_total = target.numel()
+                total_train_nans += n_nans
+                total_train_vals += n_total
+                
+                # Create mask for valid (non-NaN) target entries
+                valid_mask = ~torch.isnan(target)
+                
+                # Compute MSE only on valid entries
+                if valid_mask.any():
+                    loss = F.mse_loss(output[valid_mask], target[valid_mask])
+            
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
             output = model(data)
-            loss = F.mse_loss(output, target)
+            
+            # Count NaNs
+            n_nans = torch.isnan(target).sum().item()
+            n_total = target.numel()
+            total_train_nans += n_nans
+            total_train_vals += n_total
+            
+            valid_mask = ~torch.isnan(target)
+            
+            if valid_mask.any():
+                loss = F.mse_loss(output[valid_mask], target[valid_mask])
+            
             loss.backward()
             optimizer.step()
 
@@ -89,27 +116,47 @@ def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_
             if args.dry_run:
                 break  
 
+    frac_nans = total_train_nans / total_train_vals if total_train_vals > 0 else 0
+    print(f"Training: {frac_nans:.2%} NaNs ({total_train_nans}/{total_train_vals})")
+    
     # Normalize to get the mean loss
     train_loss /= num_batches    
     
-    # # Apply Precise BatchNorm Updates
+    # Apply Precise BatchNorm Updates
     print("Updating BatchNorm statistics with preciseBP...")
-    # # update_bn_stats(model, (data.to(device) for data, _ in train_loader), num_iters=len(train_loader))
     update_bn_stats(model, data_loader_for_precise_bn(train_loader, device), num_iters=min(len(train_loader), 200))
-    # with multiple GPUs
-    # update_bn_stats(model.module, (data.to(device) for data, _ in train_loader), num_iters=200)
+
     
     model.eval()
     val_loss = 0
     num_batches = 0
 
+    total_valid_vals = 0
+    total_valid_nans = 0
+    
     with torch.no_grad():
         for data, target in val_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            val_loss += F.mse_loss(output, target).item()
-            num_batches += 1
+            
+            # Count NaNs
+            n_nans = torch.isnan(target).sum().item()
+            n_total = target.numel()
+            total_valid_nans += n_nans
+            total_valid_vals += n_total
+            
+            # Mask NaN values
+            valid_mask = ~torch.isnan(target)
+            
+            # If there are any valid values, compute MSE only on them
+            if valid_mask.any():
+                loss = F.mse_loss(output[valid_mask], target[valid_mask])
+                val_loss += loss.item()
+                num_batches += 1
 
+    frac_valid_nans = total_valid_nans / total_valid_vals if total_valid_vals > 0 else 0
+    print(f"Training: {frac_valid_nans:.2%} NaNs ({total_valid_nans}/{total_valid_vals})")
+    
     val_loss /= num_batches  # Normalize by number of batches
     print(f'\nValidation set: Average MSE loss: {val_loss:.4f}\n')
 
@@ -216,9 +263,6 @@ def main():
     val_files = [f for f in all_files if args.val_fold in f]
     train_files = [f for f in all_files if args.test_fold not in f and args.val_fold not in f]
     
-    # for quick testing
-    # train_files = [f"/scratch1/smaruj/train_pytorch_akita/mouse_data/Hsieh2019_mESC_data_local/fold2_{i}.pt" for i in range(4)]
-    
     print(f"Training files: {len(train_files)}, Validation files: {len(val_files)}, Test files: {len(test_files)}")
     print("Loading data")
     
@@ -236,17 +280,6 @@ def main():
     print("len valid_loader", len(valid_loader))
     
     model = SeqNN()
-    # starting from loaded TF-weights
-    # parameters only
-    model = torch.load("/home1/smaruj/pytorch_akita/model_v2_mouse_model0_target0.pth").to(device)
-    # full model
-    # model.load_state_dict(torch.load("/scratch1/smaruj/train_pytorch_akita/mouse_models/model_0_v2_finetuned.pt", map_location=device))
-    
-    # multiple GPUs
-    # model = SeqNN()
-    # if use_cuda and torch.cuda.device_count() > 1:
-    #     print(f"Using {torch.cuda.device_count()} GPUs")
-    #     model = torch.nn.DataParallel(model)
     model = model.to(device)
     
     print(f"Selected optimizer: {args.optimizer}")
@@ -255,9 +288,6 @@ def main():
         optimizer = schedulefree.AdamWScheduleFree(model.parameters(), lr=args.lr, weight_decay=args.l2_scale)
     elif args.optimizer == "sgd":
         optimizer = schedulefree.SGDScheduleFree(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.l2_scale)
-    
-    # scaler = GradScaler()
-    # scaler = torch.amp.GradScaler('cuda')
     
     best_val_loss = float('inf')
     epochs_no_improve = 0
@@ -270,6 +300,41 @@ def main():
         # Write header only if the file is new
         if not file_exists:
             writer.writerow(['Epoch', 'Train Loss', 'Validation Loss'])
+        
+        # --- Compute initial losses before training ---
+        print("Computing initial losses before training...")
+        model.eval()
+        init_train_loss, init_val_loss = 0.0, 0.0
+        num_train_batches, num_val_batches = 0, 0
+
+        with torch.no_grad():
+            # Compute initial train loss
+            for data, target in train_loader:
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                valid_mask = ~torch.isnan(target)
+                if valid_mask.any():
+                    loss = F.mse_loss(output[valid_mask], target[valid_mask])
+                    init_train_loss += loss.item()
+                    num_train_batches += 1
+
+            init_train_loss /= max(num_train_batches, 1)
+
+            # Compute initial validation loss
+            for data, target in valid_loader:
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                valid_mask = ~torch.isnan(target)
+                if valid_mask.any():
+                    loss = F.mse_loss(output[valid_mask], target[valid_mask])
+                    init_val_loss += loss.item()
+                    num_val_batches += 1
+
+            init_val_loss /= max(num_val_batches, 1)
+
+        print(f"Initial Train Loss: {init_train_loss:.4f}, Initial Validation Loss: {init_val_loss:.4f}")
+        writer.writerow([0, init_train_loss, init_val_loss])
+        f.flush()
         
         for epoch in range(1, args.epochs + 1):
             train_loss, val_loss, best_val_loss, epochs_no_improve = train(

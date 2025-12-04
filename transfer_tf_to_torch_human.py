@@ -139,7 +139,7 @@ def assign_dense_weights(h5_file, tf_layer_path, pytorch_dense_layer):
 
 # ------------------------ Main conversion logic ------------------------ #
 
-def main(target_idx: int, data_split: int, organism: str):
+def main(target_idx: int, data_split: int, organism: str, data_name: str):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -153,7 +153,6 @@ def main(target_idx: int, data_split: int, organism: str):
         raise ValueError("organism must be 'human' or 'mouse'")
     
     # Paths
-    data_name = "Rao2017_HCT116"
     tf_model_path = f"/project2/fudenber_735/tensorflow_models/akita/v2/models/f{data_split}c0/train/model{model_idx}_best.h5"
     save_path = f"/scratch1/smaruj/Akita_pytorch_models/tf_transferred/{organism}_models/{data_name}"
     os.makedirs(save_path, exist_ok=True)
@@ -380,7 +379,8 @@ if __name__ == "__main__":
     parser.add_argument("--target_idx", type=int, required=True, help="Target index to extract from TF model.")
     parser.add_argument("--data_split", type=int, required=True, help="Data split index (e.g. 0–7).")
     parser.add_argument("--organism", type=str, required=True, choices=["human", "mouse"], help="Organism type.")
+    parser.add_argument("--data_name", type=str, required=True, help="Dataset name, e.g. Krietenstein2019_H1hESC")
     args = parser.parse_args()
 
-    main(args.target_idx, args.data_split, args.organism)
+    main(args.target_idx, args.data_split, args.organism, args.data_name)
     

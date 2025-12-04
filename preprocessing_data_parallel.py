@@ -10,6 +10,7 @@ from pyfaidx import Fasta
 import logging
 import random
 import os
+import re
 from multiprocessing import Pool, cpu_count
 
 
@@ -30,8 +31,6 @@ def one_hot_encode_sequence(sequence_obj):
 
     return np.expand_dims(one_hot_encoded, axis=0)
 
-
-import re
 
 def extract_coordinates_from_mseq(mseq_str):
     # Regular expression to match the format: chrom:start-end
@@ -111,10 +110,14 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2, padding=64,
     seq_hic_raw[seq_hic_nan] = np.nan
     
     # adaptively coarsegrain based on raw counts
+    # seq_hic_smoothed = adaptive_coarsegrain(
+    #                         seq_hic_raw,
+    #                         genome_hic_cool.matrix(balance=False).fetch(mseq_str),
+    #                         cutoff=2, max_levels=8)
     seq_hic_smoothed = adaptive_coarsegrain(
                             seq_hic_raw,
                             genome_hic_cool.matrix(balance=False).fetch(mseq_str),
-                            cutoff=2, max_levels=8)
+                            cutoff=4, max_levels=8)
     seq_hic_nan = np.isnan(seq_hic_smoothed)
     
     # local obs/exp
@@ -131,12 +134,9 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2, padding=64,
     log_hic_obsexp = interp_nan(log_hic_obsexp)
     for i in range(-diagonal_offset+1, diagonal_offset): set_diag(log_hic_obsexp, 0,i)
     
-    kernel = Gaussian2DKernel(x_stddev=kernel_stddev)
+    # kernel = Gaussian2DKernel(x_stddev=kernel_stddev)
+    kernel = Gaussian2DKernel(x_stddev=2)
     seq_hic = convolve(log_hic_obsexp, kernel)
-    
-    # Mask NaN-filled rows and columns before returning the result
-    seq_hic[row_nan_mask, :] = np.nan  # Mask entire rows with NaNs
-    seq_hic[:, col_nan_mask] = np.nan  # Mask entire columns with NaNs
     
     return seq_hic
 
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     # Shared dataframe (read once)
     df = pd.read_csv(args.bed_file, sep="\t", header=None, names=["chrom", "start", "end", "fold"])
 
-    gaps_df = pd.read_csv(args.gaps_file, sep="\t", header=0) if args.gaps_file else None
+    gaps_df = pd.read_csv(args.gaps_file, sep="\t", header=None, names=['chr','start','end'])
     
     # Prepare argument tuples
     fold_args = [

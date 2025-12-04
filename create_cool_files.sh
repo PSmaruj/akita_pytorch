@@ -1,32 +1,39 @@
 #!/bin/bash
-#SBATCH --job-name=Hep_hic
+#SBATCH --job-name=Bc_hic
 #SBATCH --account=fudenber_735           # adjust to your account
 #SBATCH --partition=qcb                  # adjust to your partition
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=64               # number of CPUs to use
 #SBATCH --mem=0                       # all memory
-#SBATCH --time=24:00:00
+#SBATCH --time=40:00:00
 
 # Conda env activation
 eval "$(conda shell.bash hook)"
 conda activate pytorch_cuda11.8
 
 # Set paths
-# ASSEMBLY="mm10"
-# CHROMSIZES="/project2/fudenber_735/genomes/mm10/mm10.chrom.sizes.reduced"
-ASSEMBLY="hg38"
-CHROMSIZES="/project2/fudenber_735/genomes/hg38/hg38.chrom.sizes.reduced"
+ASSEMBLY="mm10"
+CHROMSIZES="/project2/fudenber_735/genomes/mm10/mm10.chrom.sizes.reduced"
+# ASSEMBLY="hg38"
+# CHROMSIZES="/project2/fudenber_735/genomes/hg38/hg38.chrom.sizes.reduced"
 BIN_SIZE=512
-DATA_DIR="/scratch1/smaruj/Akita_pytorch_training_data/human_unprocessed_data/HepG2"
-PAIRS_FILE="4DNFIQ4G74OW.pairs.gz"
-OUT_PREFIX="${DATA_DIR}/HiC_HepG2.mm10.mapq30"
+DATA_DIR="/scratch1/smaruj/Akita_pytorch_training_data/mouse_unprocessed_data/Vian2018_Bcells"
+# PAIRS_FILE="4DNFI16FU2Y5.pairs.gz"
+
+PAIRS1="4DNFI27I3P1V.pairs.gz"
+PAIRS2="4DNFIFBBAKK4.pairs.gz"
+OUT_PREFIX="${DATA_DIR}/HiC_Vian2018_Bcells.hg38.mapq30"
 
 # --- Step 1. Merge + filter + create 512bp cool file ---
 echo "Starting Hi-C processing..."
 date
 
-zcat "${DATA_DIR}/${PAIRS_FILE}" \
+# zcat "${DATA_DIR}/${PAIRS_FILE}" \
+(
+  zcat "${DATA_DIR}/${PAIRS1}" | grep '^#'
+  zcat "${DATA_DIR}/${PAIRS1}" "${DATA_DIR}/${PAIRS2}" | grep -v '^#'
+) \
 | pairtools select '(int(mapq1)>=30) and (int(mapq2)>=30)' \
 | pairtools sort --nproc ${SLURM_CPUS_PER_TASK} \
 > ${OUT_PREFIX}.mapq30.pairs

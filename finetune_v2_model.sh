@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=HFF_m7
+#SBATCH --job-name=NPC_m7
 #SBATCH --account=fudenber_735
 #SBATCH --partition=qcbgpu 
 #SBATCH --nodes=1
@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=50
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=409600MB
-#SBATCH --time=26:00:00
+#SBATCH --time=27:00:00
 #SBATCH --constraint=l40s
 
 # Conda env activation
@@ -16,11 +16,11 @@ eval "$(conda shell.bash hook)"
 conda activate pytorch_cuda11.8
 
 # Define training arguments
-DATA_DIR="/scratch1/smaruj/Akita_pytorch_training_data/human_data/Krietenstein2019_HFF"
+DATA_DIR="/scratch1/smaruj/Akita_pytorch_training_data/mouse_data/Bonev2017_NPC"
 TEST_FOLD="fold7"
 VAL_FOLD="fold0"
-DATA_NAME="Krietenstein2019_HFF"
-ORG="human"
+DATA_NAME="Bonev2017_NPC"
+ORG="mouse"
 DATASPLIT=7
 BATCH_SIZE=4 
 EPOCHS=70

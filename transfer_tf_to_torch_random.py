@@ -153,11 +153,11 @@ def main(data_split: int, organism: str):
         raise ValueError("organism must be 'human' or 'mouse'")
     
     # Paths
-    data_name = "Monahan2019_ORC"
     tf_model_path = f"/project2/fudenber_735/tensorflow_models/akita/v2/models/f{data_split}c0/train/model{model_idx}_best.h5"
-    save_path = f"/scratch1/smaruj/Akita_pytorch_models/tf_transferred/{organism}_models/{data_name}"
+    # save_path = f"/scratch1/smaruj/Akita_pytorch_models/tf_transferred/{organism}_models/{data_name}"
+    save_path = f"/scratch1/smaruj/Akita_pytorch_models/tf_transferred/random_dense_layer"
     os.makedirs(save_path, exist_ok=True)
-    output_file = f"{save_path}/Akita_v2_{organism}_{data_name}_model{data_split}.pth"
+    output_file = f"{save_path}/Akita_v2_random_dense_model{data_split}.pth"
 
     # Load model and weights
     print(f"Loading TensorFlow weights from: {tf_model_path}")
