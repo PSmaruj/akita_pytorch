@@ -7,43 +7,7 @@ import torch.nn.functional as F
 from fvcore.nn.precise_bn import update_bn_stats
 from akita_model.model import SeqNN
 import schedulefree
-
-
-# =====================
-# Dataset Definition
-# =====================
-class HiCDataset(Dataset):
-    def __init__(self, data_files):
-        self.data = []  # To store all sequences and HiC vectors
-        
-        # Load and process the data files
-        for file in data_files:
-            print("Loading file:", file)
-            file_data = torch.load(file, weights_only=True)
-            
-            for data in file_data:
-                ohe_sequence, hic_vector = data
-
-                # Process the OHE sequence
-                ohe_sequence = ohe_sequence.squeeze(0)  # Remove singleton dimension
-                
-                # Ensure the sequence has the correct shape
-                assert ohe_sequence.shape[0] == 4, f"Expected 4 channels, but got {ohe_sequence.shape[0]}"
-                assert len(ohe_sequence.shape) == 2, f"Expected 2D shape for sequence, but got {ohe_sequence.shape}"
-                
-                # Add processed pair to the data list
-                self.data.append((ohe_sequence, hic_vector))
-        
-        print(f"Total sequences loaded: {len(self.data)}")
-        
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        # Fetch the preprocessed (ohe_sequence, hic_vector) pair from memory
-        ohe_sequence, hic_vector = self.data[idx]
-        return ohe_sequence, hic_vector
-
+from data_processing.dataset import HiCDataset
 
 # =====================
 # Utility Functions
