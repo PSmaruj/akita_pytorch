@@ -101,17 +101,51 @@ class SeqNN(nn.Module):
 
         # Dilated residual blocks with Fibonacci-like dilation rates
         # These capture multi-scale features with increasing receptive fields
-        dilation_rates = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 145]
-        self.residual1d_blocks = nn.ModuleList([
-            ResidualDilatedBlock1D(
-                in_channels=128,
-                mid_channels=64,
-                dropout_rate=0.1,
-                dilation_rate=rate,
-                bn_momentum=0.1,
-                norm_type='batch'
-            ) for rate in dilation_rates
-        ])
+        # 1D residual blocks (old naming for compatibility)
+        self.residual1d_block1 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=1, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block2 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=2, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block3 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=3, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block4 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=5, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block5 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=8, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block6 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=13, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block7 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=21, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block8 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=34, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block9 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=55, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block10 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=89, bn_momentum=0.1, norm_type='batch'
+        )
+        self.residual1d_block11 = ResidualDilatedBlock1D(
+            in_channels=128, mid_channels=64, dropout_rate=0.1,
+            dilation_rate=145, bn_momentum=0.1, norm_type='batch'
+        )
         
         # Channel reduction layer
         self.conv_reduce = ConvBlockReduce(
@@ -141,17 +175,30 @@ class SeqNN(nn.Module):
         self.symmetrize_2d = Symmetrize2D()
         
         # 2D dilated residual blocks
-        dilation_rates_2d = [1, 2, 4, 7, 12, 21]
-        self.residual2d_blocks = nn.ModuleList([
-            DilatedResidualBlock2D(
-                in_channels=80, 
-                mid_channels=40, 
-                kernel_size=3, 
-                dilation_rate=rate,
-                dropout_prob=0.1,
-                norm_type='batch'
-            ) for rate in dilation_rates_2d
-        ])
+        self.residual2d_block1 = DilatedResidualBlock2D(
+            in_channels=80, mid_channels=40, kernel_size=3, dilation_rate=1,
+            dropout_prob=0.1, norm_type='batch'
+        )
+        self.residual2d_block2 = DilatedResidualBlock2D(
+            in_channels=80, mid_channels=40, kernel_size=3, dilation_rate=2,
+            dropout_prob=0.1, norm_type='batch'
+        )
+        self.residual2d_block3 = DilatedResidualBlock2D(
+            in_channels=80, mid_channels=40, kernel_size=3, dilation_rate=4,
+            dropout_prob=0.1, norm_type='batch'
+        )
+        self.residual2d_block4 = DilatedResidualBlock2D(
+            in_channels=80, mid_channels=40, kernel_size=3, dilation_rate=7,
+            dropout_prob=0.1, norm_type='batch'
+        )
+        self.residual2d_block5 = DilatedResidualBlock2D(
+            in_channels=80, mid_channels=40, kernel_size=3, dilation_rate=12,
+            dropout_prob=0.1, norm_type='batch'
+        )
+        self.residual2d_block6 = DilatedResidualBlock2D(
+            in_channels=80, mid_channels=40, kernel_size=3, dilation_rate=21,
+            dropout_prob=0.1, norm_type='batch'
+        )
         
         # Channel attention mechanism
         self.squeeze_excite = SqueezeExcite(
@@ -198,8 +245,17 @@ class SeqNN(nn.Module):
         x = self.conv_tower(x)
         
         # Apply all 1D residual blocks
-        for residual_block in self.residual1d_blocks:
-            x = residual_block(x)
+        x = self.residual1d_block1(x)
+        x = self.residual1d_block2(x)
+        x = self.residual1d_block3(x)
+        x = self.residual1d_block4(x)
+        x = self.residual1d_block5(x)
+        x = self.residual1d_block6(x)
+        x = self.residual1d_block7(x)
+        x = self.residual1d_block8(x)
+        x = self.residual1d_block9(x)
+        x = self.residual1d_block10(x)
+        x = self.residual1d_block11(x)
         
         x = self.conv_reduce(x)
         
@@ -211,8 +267,12 @@ class SeqNN(nn.Module):
         x = self.symmetrize_2d(x)
         
         # Apply all 2D residual blocks
-        for residual_block in self.residual2d_blocks:
-            x = residual_block(x)
+        x = self.residual2d_block1(x)
+        x = self.residual2d_block2(x)
+        x = self.residual2d_block3(x)
+        x = self.residual2d_block4(x)
+        x = self.residual2d_block5(x)
+        x = self.residual2d_block6(x)
         
         x = self.squeeze_excite(x)
         x = self.cropping_2d(x)
