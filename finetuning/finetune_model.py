@@ -24,142 +24,13 @@ import schedulefree
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from akita_model.model import SeqNN
-from data_processing.dataset import HiCDataset
+from data_preprocessing.dataset import HiCDataset
 
-
-# =============================================================================
-# Utility Functions
-# =============================================================================
-
-def data_loader_for_precise_bn(loader, device):
-    """
-    Generator wrapper for precise BatchNorm statistics computation.
-    
-    Args:
-        loader (DataLoader): Training data loader
-        device: PyTorch device
-    
-    Yields:
-        torch.Tensor: Input data batches
-    """
-    for data, _ in loader:
-        yield data.to(device)
-
-
-# =============================================================================
-# Training and Validation
-# =============================================================================
-
-def compute_loss(output, target):
-    """
-    Compute MSE loss, ignoring NaN values in target.
-    
-    Args:
-        output (torch.Tensor): Model predictions
-        target (torch.Tensor): Ground truth (may contain NaNs)
-    
-    Returns:
-        torch.Tensor: MSE loss computed only on valid (non-NaN) entries
-    """
-    valid_mask = ~torch.isnan(target)
-    if not valid_mask.any():
-        # All targets are NaN - return zero loss
-        return torch.tensor(0.0, device=output.device)
-    return F.mse_loss(output[valid_mask], target[valid_mask])
-
-
-def train_epoch(model, device, train_loader, optimizer, epoch, args):
-    """
-    Train for one epoch.
-    
-    Args:
-        model: PyTorch model
-        device: PyTorch device
-        train_loader: Training data loader
-        optimizer: Optimizer (schedulefree.AdamWScheduleFree or SGDScheduleFree)
-        epoch (int): Current epoch number
-        args: Command line arguments
-    
-    Returns:
-        float: Average training loss for the epoch
-    """
-    model.train()
-    optimizer.train()
-    
-    total_loss = 0.0
-    num_batches = 0
-    
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        
-        # Forward pass and compute loss
-        output = model(data)
-        loss = compute_loss(output, target)
-        
-        # Backward pass
-        loss.backward()
-        optimizer.step()
-        
-        # Apply weight clipping
-        if args.weight_clipping > 0:
-            for param in model.parameters():
-                param.data.clamp_(-args.weight_clipping, args.weight_clipping)
-
-        total_loss += loss.item()
-        num_batches += 1
-        
-        # Logging
-        if batch_idx % args.log_interval == 0:
-            print(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} '
-                  f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-            
-            if args.dry_run:
-                break
-
-    avg_loss = total_loss / max(num_batches, 1)
-    
-    # Update BatchNorm statistics with precise estimation
-    print("Updating BatchNorm statistics with preciseBN...")
-    update_bn_stats(
-        model, 
-        data_loader_for_precise_bn(train_loader, device), 
-        num_iters=min(len(train_loader), 200)
-    )
-    
-    return avg_loss
-
-
-def validate(model, device, val_loader):
-    """
-    Validate model on validation set.
-    
-    Args:
-        model: PyTorch model
-        device: PyTorch device
-        val_loader: Validation data loader
-    
-    Returns:
-        float: Average validation loss
-    """
-    model.eval()
-    total_loss = 0.0
-    num_batches = 0
-
-    with torch.no_grad():
-        for data, target in val_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            
-            loss = compute_loss(output, target)
-            if loss.item() > 0:  # Only count batches with valid data
-                total_loss += loss.item()
-                num_batches += 1
-    
-    avg_loss = total_loss / max(num_batches, 1)
-    print(f'Validation set: Average MSE loss: {avg_loss:.4f}\n')
-    
-    return avg_loss
+from training.training_utils import (
+    train_epoch,
+    validate,
+    compute_initial_losses
+)
 
 
 # =============================================================================
@@ -439,23 +310,9 @@ def main():
     # ==========================================================================
     
     print('Computing initial losses (before training)...')
-    model.eval()
-    
-    with torch.no_grad():
-        # Initial training loss
-        init_train_loss = 0.0
-        num_train_batches = 0
-        for data, target in train_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            loss = compute_loss(output, target)
-            if loss.item() > 0:
-                init_train_loss += loss.item()
-                num_train_batches += 1
-        init_train_loss /= max(num_train_batches, 1)
-        
-        # Initial validation loss
-        init_val_loss = validate(model, device, val_loader)
+    init_train_loss, init_val_loss = compute_initial_losses(
+        model, device, train_loader, val_loader
+    )
     
     print(f'Initial Train Loss: {init_train_loss:.6f}')
     print(f'Initial Validation Loss: {init_val_loss:.6f}')
