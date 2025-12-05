@@ -1,79 +1,149 @@
+#!/usr/bin/env python3
+"""
+Fine-tune pretrained Akita v2 model on new Hi-C datasets.
+
+This script fine-tunes a pretrained Akita model (transferred from TensorFlow)
+on a new Hi-C dataset. It includes:
+- Loading pretrained weights
+- Training with early stopping
+- Precise BatchNorm statistics updates
+- Loss tracking and model checkpointing
+"""
+
 import argparse
 import csv
 import os
+import sys
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from fvcore.nn.precise_bn import update_bn_stats
-from akita_model.model import SeqNN
 import schedulefree
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from akita_model.model import SeqNN
 from data_processing.dataset import HiCDataset
 
-# =====================
+
+# =============================================================================
 # Utility Functions
-# =====================
+# =============================================================================
+
 def data_loader_for_precise_bn(loader, device):
+    """
+    Generator wrapper for precise BatchNorm statistics computation.
+    
+    Args:
+        loader (DataLoader): Training data loader
+        device: PyTorch device
+    
+    Yields:
+        torch.Tensor: Input data batches
+    """
     for data, _ in loader:
         yield data.to(device)
 
 
-# =====================
-# Training / Validation
-# =====================
-def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_val_loss, epochs_no_improve, weight_clip_value, save_model=False, save_model_path=None, scaler=None):
+# =============================================================================
+# Training and Validation
+# =============================================================================
+
+def compute_loss(output, target):
+    """
+    Compute MSE loss, ignoring NaN values in target.
+    
+    Args:
+        output (torch.Tensor): Model predictions
+        target (torch.Tensor): Ground truth (may contain NaNs)
+    
+    Returns:
+        torch.Tensor: MSE loss computed only on valid (non-NaN) entries
+    """
+    valid_mask = ~torch.isnan(target)
+    if not valid_mask.any():
+        # All targets are NaN - return zero loss
+        return torch.tensor(0.0, device=output.device)
+    return F.mse_loss(output[valid_mask], target[valid_mask])
+
+
+def train_epoch(model, device, train_loader, optimizer, epoch, args):
+    """
+    Train for one epoch.
+    
+    Args:
+        model: PyTorch model
+        device: PyTorch device
+        train_loader: Training data loader
+        optimizer: Optimizer (schedulefree.AdamWScheduleFree or SGDScheduleFree)
+        epoch (int): Current epoch number
+        args: Command line arguments
+    
+    Returns:
+        float: Average training loss for the epoch
+    """
     model.train()
     optimizer.train()
     
-    train_loss = 0  # Initialize training loss
+    total_loss = 0.0
     num_batches = 0
-
+    
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
-
-        if scaler is not None:
-            with torch.amp.autocast('cuda'):
-                output = model(data)
-                
-                # Create mask for valid (non-NaN) target entries
-                valid_mask = ~torch.isnan(target)
-                
-                # Compute MSE only on valid entries
-                loss = F.mse_loss(output[valid_mask], target[valid_mask])
-            
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            output = model(data)
-            valid_mask = ~torch.isnan(target)
-            loss = F.mse_loss(output[valid_mask], target[valid_mask])
-            loss.backward()
-            optimizer.step()
-    
-        # Apply weight clipping
-        for param in model.parameters():
-            param.data.clamp_(-weight_clip_value, weight_clip_value)
         
-        train_loss += loss.item()  # SUM of batch losses
+        # Forward pass and compute loss
+        output = model(data)
+        loss = compute_loss(output, target)
+        
+        # Backward pass
+        loss.backward()
+        optimizer.step()
+        
+        # Apply weight clipping
+        if args.weight_clipping > 0:
+            for param in model.parameters():
+                param.data.clamp_(-args.weight_clipping, args.weight_clipping)
+
+        total_loss += loss.item()
         num_batches += 1
-
+        
+        # Logging
         if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
+            print(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} '
+                  f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
+            
             if args.dry_run:
-                break  
+                break
 
-    # Normalize to get the mean loss
-    train_loss /= num_batches    
+    avg_loss = total_loss / max(num_batches, 1)
     
-    # # Apply Precise BatchNorm Updates
-    print("Updating BatchNorm statistics with preciseBP...")
-    update_bn_stats(model, data_loader_for_precise_bn(train_loader, device), num_iters=min(len(train_loader), 200))
+    # Update BatchNorm statistics with precise estimation
+    print("Updating BatchNorm statistics with preciseBN...")
+    update_bn_stats(
+        model, 
+        data_loader_for_precise_bn(train_loader, device), 
+        num_iters=min(len(train_loader), 200)
+    )
     
+    return avg_loss
+
+
+def validate(model, device, val_loader):
+    """
+    Validate model on validation set.
+    
+    Args:
+        model: PyTorch model
+        device: PyTorch device
+        val_loader: Validation data loader
+    
+    Returns:
+        float: Average validation loss
+    """
     model.eval()
-    val_loss = 0
+    total_loss = 0.0
     num_batches = 0
 
     with torch.no_grad():
@@ -81,193 +151,383 @@ def train(args, model, device, train_loader, val_loader, optimizer, epoch, best_
             data, target = data.to(device), target.to(device)
             output = model(data)
             
-            # Mask NaN values
-            valid_mask = ~torch.isnan(target)
-            
-            # If there are any valid values, compute MSE only on them
-            if valid_mask.any():
-                loss = F.mse_loss(output[valid_mask], target[valid_mask])
-                val_loss += loss.item()
+            loss = compute_loss(output, target)
+            if loss.item() > 0:  # Only count batches with valid data
+                total_loss += loss.item()
                 num_batches += 1
-
-    val_loss /= num_batches  # Normalize by number of batches
-    print(f'\nValidation set: Average MSE loss: {val_loss:.4f}\n')
-
-    # Early Stopping Logic
-    if val_loss < best_val_loss:
-        print(f"Validation loss improved: {best_val_loss:.6f} -> {val_loss:.6f}")
-        best_val_loss = val_loss
-        epochs_no_improve = 0
-        
-        if save_model:            
-            # overwritting the model
-            torch.save(model.state_dict(), save_model_path)
-        
-    else:
-        epochs_no_improve += 1
     
-    return train_loss, val_loss, best_val_loss, epochs_no_improve  # Return training and validation losses        
+    avg_loss = total_loss / max(num_batches, 1)
+    print(f'Validation set: Average MSE loss: {avg_loss:.4f}\n')
+    
+    return avg_loss
 
 
-# =====================
-# Main
-# =====================
+# =============================================================================
+# Main Training Loop
+# =============================================================================
+
 def main():
-    parser = argparse.ArgumentParser(description='Toy Akita Example')
+    parser = argparse.ArgumentParser(
+        description='Fine-tune Akita v2 model on new Hi-C dataset',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    # Data arguments
+    parser.add_argument(
+        '--data_dir',
+        type=str,
+        required=True,
+        help='Path to dataset directory containing .pt files'
+    )
+    parser.add_argument(
+        '--test_fold',
+        type=str,
+        required=True,
+        help='Fold to use as test data (e.g., "fold0")'
+    )
+    parser.add_argument(
+        '--val_fold',
+        type=str,
+        required=True,
+        help='Fold to use as validation data (e.g., "fold1")'
+    )
+    parser.add_argument(
+        '--data_name',
+        type=str,
+        required=True,
+        help='Dataset name (e.g., "Bonev2017_CN")'
+    )
+    parser.add_argument(
+        '--organism',
+        type=str,
+        required=True,
+        choices=['mouse', 'human'],
+        help='Organism (mouse or human)'
+    )
+    parser.add_argument(
+        '--data-split',
+        type=int,
+        required=True,
+        help='Model split index (e.g., 0, 1, 2...)'
+    )
     
-    # --- Data ---
-    parser.add_argument("--data_dir", type=str, required=True, 
-                        help="Path to dataset directory containing .pt files.")
-    parser.add_argument("--test_fold", type=str, required=True, 
-                        help="Fold to use as test data (e.g., 'fold0').")
-    parser.add_argument("--data_name", type=str, required=True, 
-                        help="Data name used (e.g., 'Bonev2017_CN').")
-    parser.add_argument("--val_fold", type=str, required=True, 
-                        help="Fold to use as validation data (e.g., 'fold1').")
-    parser.add_argument("--organism", type=str, required=True, choices=["mouse", "human"],
-                        help="Organism name, used for selecting pretrained model.")
-    parser.add_argument("--data-split", type=int, required=True,
-                        help="Model split index (e.g., 0, 1, 2...).")
-    
-    # --- Training ---
-    parser.add_argument('--batch-size', type=int, default=4, metavar='N',
-                        help='input batch size for training (default: 4)')
-    parser.add_argument('--epochs', type=int, default=100, metavar='N',
-                        help='number of epochs to train (default: 200)')
-    parser.add_argument('--lr', type=float, default=0.002, metavar='LR',
-                        help='learning rate (default: 0.002)')
-    parser.add_argument('--optimizer', type=str, default="adam", choices=["adam", "sgd"],
-                        help='Choose optimizer: "adam" (default) or "sgd"')
-    parser.add_argument('--momentum', type=float, default=0.98,
-                        help='Momentum value for SGD optimizer (default: 0.99575). Ignored if using Adam.')
-    parser.add_argument('--l2-scale', type=float, default=1.5e-5,
-                        help='L2 regularization weight (default: 1.5e-5).')
-    parser.add_argument('--weight-clipping', type=float, default=20.0,
-                        help='')
-    parser.add_argument('--early-stop-patience', type=int, default=8,
-                    help='Stop training if validation loss does not improve for this many epochs')
-    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
-                        help='how many batches to wait before logging training status')
-    
-    # --- Misc ---
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
-    parser.add_argument('--dry-run', action='store_true', default=False,
-                        help='quickly check a single pass')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
-    parser.add_argument('--save-model', action='store_true', default=False,
-                        help='For Saving the current Model')
+    # Training hyperparameters
+    parser.add_argument(
+        '--batch-size',
+        type=int,
+        default=4,
+        help='Training batch size'
+    )
+    parser.add_argument(
+        '--epochs',
+        type=int,
+        default=100,
+        help='Number of training epochs'
+    )
+    parser.add_argument(
+        '--lr',
+        type=float,
+        default=0.002,
+        help='Learning rate'
+    )
+    parser.add_argument(
+        '--optimizer',
+        type=str,
+        default='adam',
+        choices=['adam', 'sgd'],
+        help='Optimizer type'
+    )
+    parser.add_argument(
+        '--momentum',
+        type=float,
+        default=0.98,
+        help='Momentum for SGD optimizer (ignored for Adam)'
+    )
+    parser.add_argument(
+        '--l2-scale',
+        type=float,
+        default=1.5e-5,
+        help='L2 regularization weight (weight_decay)'
+    )
+    parser.add_argument(
+        '--weight-clipping',
+        type=float,
+        default=20.0,
+        help='Weight clipping value (0 to disable)'
+    )
+    parser.add_argument(
+        '--early-stop-patience',
+        type=int,
+        default=8,
+        help='Early stopping patience (epochs without improvement)'
+    )
+
+    # Logging and saving
+    parser.add_argument(
+        '--log-interval',
+        type=int,
+        default=100,
+        help='Batches between training status logs'
+    )
+    parser.add_argument(
+        '--save-model',
+        action='store_true',
+        default=False,
+        help='Save the best model checkpoint'
+    )
+
+    # System arguments
+    parser.add_argument(
+        '--no-cuda',
+        action='store_true',
+        default=False,
+        help='Disable CUDA training'
+    )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        default=False,
+        help='Quick single-pass check'
+    )
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=1,
+        help='Random seed'
+    )
     
     args = parser.parse_args()
     
-    # --- Setup ---
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
-    device = torch.device("cuda" if use_cuda else "cpu")
-    torch.manual_seed(args.seed)
-
-    train_kwargs = {'batch_size': args.batch_size}
-    if use_cuda:
-        cuda_kwargs = {'num_workers': 1,
-                       'pin_memory': True,
-                       'shuffle': True}
-        train_kwargs.update(cuda_kwargs)
+    # ==========================================================================
+    # Setup
+    # ==========================================================================
     
-    # --- Load data ---
-    all_files = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith(".pt")]
+    use_cuda = not args.no_cuda and torch.cuda.is_available()
+    device = torch.device('cuda' if use_cuda else 'cpu')
+    torch.manual_seed(args.seed)
+    
+    print('=' * 70)
+    print('Akita v2 Fine-tuning')
+    print('=' * 70)
+    print(f'Device: {device}')
+    print(f'Organism: {args.organism}')
+    print(f'Dataset: {args.data_name}')
+    print(f'Split: {args.data_split}')
+    print(f'Test fold: {args.test_fold}')
+    print(f'Val fold: {args.val_fold}')
+    print(f'Epochs: {args.epochs}')
+    print(f'Batch size: {args.batch_size}')
+    print(f'Learning rate: {args.lr}')
+    print(f'Optimizer: {args.optimizer}')
+    print(f'Early stopping patience: {args.early_stop_patience}')
+    print('=' * 70)
+    print()
+
+    # ==========================================================================
+    # Load Data
+    # ==========================================================================
+    
+    print('Loading data...')
+    all_files = [
+        os.path.join(args.data_dir, f) 
+        for f in os.listdir(args.data_dir) 
+        if f.endswith('.pt')
+    ]
+    
     test_files = [f for f in all_files if args.test_fold in f]
     val_files = [f for f in all_files if args.val_fold in f]
-    train_files = [f for f in all_files if args.test_fold not in f and args.val_fold not in f]
+    train_files = [
+        f for f in all_files 
+        if args.test_fold not in f and args.val_fold not in f
+    ]
     
-    print(f"Training files: {len(train_files)}, Validation files: {len(val_files)}, Test files: {len(test_files)}")
-    print("Loading data")
+    print(f'Training files: {len(train_files)}')
+    print(f'Validation files: {len(val_files)}')
+    print(f'Test files: {len(test_files)}')
     
     train_dataset = HiCDataset(train_files)
     val_dataset = HiCDataset(val_files)
     
-    # differece: Akita.v2 has a parameter shuffle_buffer=128
-    # Here, the entire train set is shuffled randomly at the beginning of each epoch, so it's more randomized than using shuffle_buffer
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, drop_last=True, shuffle=True, num_workers=4, pin_memory=True)
-    valid_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        drop_last=True,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True
+    )
     
-    print("len train_loader", len(train_loader))
-    print("len valid_loader", len(valid_loader))
+    print(f'Train batches: {len(train_loader)}')
+    print(f'Validation batches: {len(val_loader)}')
+    print()
     
-    torch.serialization.add_safe_globals([SeqNN])
+    # ==========================================================================
+    # Load Pretrained Model
+    # ==========================================================================
     
-    # --- Model ---
-    print(f"Loading pretrained model for {args.organism}, {args.data_name}, split {args.data_split}")
-    model_path = f"/scratch1/smaruj/Akita_pytorch_models/tf_transferred/{args.organism}_models/" \
-                 f"{args.data_name}/Akita_v2_{args.organism}_{args.data_name}_model{args.data_split}.pth"
+    print('Loading pretrained model...')
+    model_path = (
+        f'/scratch1/smaruj/Akita_pytorch_models/tf_transferred/{args.organism}_models/'
+        f'{args.data_name}/Akita_v2_{args.organism}_{args.data_name}_model{args.data_split}.pth'
+    )
+    
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f'Pretrained model not found: {model_path}')
+    
+    print(f'Loading from: {model_path}')
 
-    # randomly initialized top layer
-    # model_path = f"/scratch1/smaruj/Akita_pytorch_models/tf_transferred/random_dense_layer/Akita_v2_random_dense_model{args.data_split}.pth"
-
-    # model = torch.load(model_path, map_location=device)  # loads the entire SeqNN
-    # model.to(device)
-    
-    model = torch.load(model_path, map_location=device, weights_only=False)  
-    model.to(device) 
+    model = torch.load(model_path, map_location=device, weights_only=False)
+    model.to(device)
     model.train()
+    
+    print('✓ Model loaded successfully')
+    print()
 
-    # Select optimizer
-    print(f"Selected optimizer: {args.optimizer}")
-    if args.optimizer == "adam":
-        optimizer = schedulefree.AdamWScheduleFree(model.parameters(), lr=args.lr, weight_decay=args.l2_scale)
-    elif args.optimizer == "sgd":
-        optimizer = schedulefree.SGDScheduleFree(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.l2_scale)
+    # ==========================================================================
+    # Setup Optimizer
+    # ==========================================================================
+
+    print(f'Setting up {args.optimizer} optimizer...')
+    
+    if args.optimizer == 'adam':
+        optimizer = schedulefree.AdamWScheduleFree(
+            model.parameters(),
+            lr=args.lr,
+            weight_decay=args.l2_scale
+        )
+    elif args.optimizer == 'sgd':
+        optimizer = schedulefree.SGDScheduleFree(
+            model.parameters(),
+            lr=args.lr,
+            momentum=args.momentum,
+            weight_decay=args.l2_scale
+        )
+    
+    print('✓ Optimizer configured')
+    print()
+    
+    # ==========================================================================
+    # Setup Output Paths
+    # ==========================================================================
+
+    output_base = f'/scratch1/smaruj/Akita_pytorch_models/finetuned/{args.organism}_models/{args.data_name}'
+    save_model_path = (
+        f'{output_base}/models/'
+        f'Akita_v2_{args.organism}_{args.data_name}_model{args.data_split}_finetuned.pth'
+    )
+    save_losses_path = (
+        f'{output_base}/losses/'
+        f'Akita_v2_{args.organism}_{args.data_name}_model{args.data_split}_finetuned.csv'
+    )
+
+    # Create directories
+    os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
+    os.makedirs(os.path.dirname(save_losses_path), exist_ok=True)
+    
+    print(f'Model checkpoint will be saved to: {save_model_path}')
+    print(f'Loss history will be saved to: {save_losses_path}')
+    print()
+
+    # ==========================================================================
+    # Compute Initial Losses
+    # ==========================================================================
+    
+    print('Computing initial losses (before training)...')
+    model.eval()
+    
+    with torch.no_grad():
+        # Initial training loss
+        init_train_loss = 0.0
+        num_train_batches = 0
+        for data, target in train_loader:
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            loss = compute_loss(output, target)
+            if loss.item() > 0:
+                init_train_loss += loss.item()
+                num_train_batches += 1
+        init_train_loss /= max(num_train_batches, 1)
+        
+        # Initial validation loss
+        init_val_loss = validate(model, device, val_loader)
+    
+    print(f'Initial Train Loss: {init_train_loss:.6f}')
+    print(f'Initial Validation Loss: {init_val_loss:.6f}')
+    print()
+    
+    # ==========================================================================
+    # Training Loop
+    # ==========================================================================
+    
+    print('=' * 70)
+    print('Starting training...')
+    print('=' * 70)
+    print()
     
     best_val_loss = float('inf')
     epochs_no_improve = 0
     
-    save_model_path = f"/scratch1/smaruj/Akita_pytorch_models/finetuned/{args.organism}_models/{args.data_name}/models/Akita_v2_{args.organism}_{args.data_name}_model{args.data_split}_finetuned.pth"
-    save_losses = f"/scratch1/smaruj/Akita_pytorch_models/finetuned/{args.organism}_models/{args.data_name}/losses/Akita_v2_{args.organism}_{args.data_name}_model{args.data_split}_finetuned.csv"
-    
-    # --- Training Loop ---
-    file_exists = os.path.isfile(save_losses)
-    with open(save_losses, 'a', newline='') as f:
+    # Open CSV file for logging
+    file_exists = os.path.isfile(save_losses_path)
+    with open(save_losses_path, 'a', newline='') as f:
         writer = csv.writer(f)
-        
-        # Write header only if the file is new
+    
+        # Write header if new file
         if not file_exists:
             writer.writerow(['Epoch', 'Train Loss', 'Validation Loss'])
-        
-        # --- Compute initial losses before training ---
-        print("Computing initial losses before training...")
-        model.eval()
-        init_train_loss, init_val_loss = 0.0, 0.0
-        num_train_batches, num_val_batches = 0, 0
-
-        with torch.no_grad():
-            # Compute initial train loss
-            for data, target in train_loader:
-                data, target = data.to(device), target.to(device)
-                output = model(data)
-                valid_mask = ~torch.isnan(target)
-                if valid_mask.any():
-                    loss = F.mse_loss(output[valid_mask], target[valid_mask])
-                    init_train_loss += loss.item()
-                    num_train_batches += 1
-
-            init_train_loss /= max(num_train_batches, 1)
-
-            # Compute initial validation loss
-            for data, target in valid_loader:
-                data, target = data.to(device), target.to(device)
-                output = model(data)
-                valid_mask = ~torch.isnan(target)
-                if valid_mask.any():
-                    loss = F.mse_loss(output[valid_mask], target[valid_mask])
-                    init_val_loss += loss.item()
-                    num_val_batches += 1
-
-            init_val_loss /= max(num_val_batches, 1)
-
-        print(f"Initial Train Loss: {init_train_loss:.4f}, Initial Validation Loss: {init_val_loss:.4f}")
+            
+        # Write initial losses (epoch 0)
         writer.writerow([0, init_train_loss, init_val_loss])
         f.flush()
-        
+
+        # Training epochs
         for epoch in range(1, args.epochs + 1):
+            # Train
+            train_loss = train_epoch(
+                model, device, train_loader, optimizer, epoch, args
+            )
+            
+            # Validate
+            val_loss = validate(model, device, val_loader)
+
+            # Log losses
+            writer.writerow([epoch, train_loss, val_loss])
+            f.flush()
+            
+            # Check for improvement
+            if val_loss < best_val_loss:
+                improvement = best_val_loss - val_loss
+                print(f'✓ Validation loss improved: {best_val_loss:.6f} → {val_loss:.6f} '
+                      f'(Δ {improvement:.6f})')
+                best_val_loss = val_loss
+                epochs_no_improve = 0
+                
+                # Save best model
+                if args.save_model:
+                    torch.save(model.state_dict(), save_model_path)
+                    print(f'✓ Model saved to {save_model_path}')
+            else:
+                epochs_no_improve += 1
+                print(f'No improvement for {epochs_no_improve} epoch(s)')
+            
+            print()
+
+            # Early stopping
+            if epochs_no_improve >= args.early_stop_patience:
+                print('=' * 70)
+                print(f'Early stopping triggered after {epoch} epochs!')
+                print(f'Best validation loss: {best_val_loss:.6f}')
+                print('=' * 70)
+                break
+            
+            
+
             train_loss, val_loss, best_val_loss, epochs_no_improve = train(
                 args, model, device, train_loader, valid_loader,
                 optimizer, epoch, best_val_loss, epochs_no_improve,
@@ -275,15 +535,17 @@ def main():
                 save_model=args.save_model, save_model_path=save_model_path,
                 scaler=None
             )
-
-            # Append training and validation losses for the current epoch
-            writer.writerow([epoch, train_loss, val_loss])
-            f.flush()  # Ensure the data is written to the file immediately
-            
-            if epochs_no_improve >= args.early_stop_patience:
-                print(f"Early stopping triggered after {epoch} epochs!")
-                break
+    
+    print()
+    print('=' * 70)
+    print('Training complete!')
+    print('=' * 70)
+    print(f'Best validation loss: {best_val_loss:.6f}')
+    print(f'Loss history saved to: {save_losses_path}')
+    if args.save_model:
+        print(f'Best model saved to: {save_model_path}')
+    print('=' * 70)
+       
         
 if __name__ == '__main__':
     main()
-
