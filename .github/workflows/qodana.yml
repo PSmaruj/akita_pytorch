@@ -19,7 +19,8 @@ jobs:
           artifact-name: qodana-report
           use-annotations: true
       
-      - name: Upload Qodana SARIF to GitHub
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload Qodana SARIF
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
