@@ -15,7 +15,6 @@ jobs:
       - name: Qodana Scan
         uses: JetBrains/qodana-action@v2024.2
         with:
-          args: --save-report --results-dir qodana-results
           upload-result: true
           artifact-name: qodana-report
           use-annotations: true
