@@ -1,0 +1,54 @@
+name: pytorch_akita
+channels:
+  - pytorch
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  # Python
+  - python=3.10
+
+  # Deep Learning
+  - pytorch>=2.0.0
+  - torchvision>=0.15.0
+  - pytorch-cuda=11.8  # Adjust based on your CUDA version, or use cpuonly
+
+  # Core Scientific Computing
+  - numpy>=1.24.0,<2.0.0
+  - pandas>=2.0.0
+  - scipy>=1.10.0
+
+  # Hi-C Data Processing
+  - h5py>=3.8.0
+  - cooler>=0.10.0
+  - cooltools>=0.7.0
+  - bioframe>=0.8.0
+  - pyfaidx>=0.9.0
+  - pysam>=0.20.0
+
+  # Astronomy/Physics (for convolution)
+  - astropy>=6.0.0
+
+  # Visualization
+  - matplotlib>=3.7.0
+  - seaborn>=0.13.0
+
+  # Machine Learning
+  - scikit-learn>=1.3.0
+
+  # Testing
+  - pytest>=7.3.0
+  - pytest-cov>=4.0.0
+
+  # Jupyter (optional)
+  - jupyter>=1.0.0
+  - jupyterlab>=4.0.0
+  - ipykernel>=6.22.0
+
+  # pip packages (not available in conda or better installed via pip)
+  - pip
+  - pip:
+    - schedulefree
+    - fvcore
+    - pairtools  # If not available in conda
