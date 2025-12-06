@@ -9,10 +9,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Qodana Scan
         uses: JetBrains/qodana-action@v2024.1
         with:
           linter: jetbrains/qodana-python-community:2024.1
-          args: --save-report
+          args: --save-report --results-dir qodana-results
+      
+      - name: Upload Qodana report
+        uses: actions/upload-artifact@v3
+        with:
+          name: qodana-report
+          path: qodana-results/report
