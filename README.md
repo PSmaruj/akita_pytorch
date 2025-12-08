@@ -213,7 +213,7 @@ If you use this code in your research, please cite:
 
 **Sequence Design for Genome Folding using PyTorch Akita**:
 ```
-[PLACEHOLDER - Add your preprint citation]
+[PLACEHOLDER - our preprint citation]
 ```
 
 **AkitaV2 (original TensorFlow implementation)**:
