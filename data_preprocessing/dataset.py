@@ -56,10 +56,12 @@ class HiCDataset(Dataset):
                 ohe_sequence = ohe_sequence.squeeze(0)  # Remove singleton dimension
 
                 # Ensure the sequence has the correct shape
-                assert ohe_sequence.shape[0] == 4, \
-                    f"Expected 4 channels, but got {ohe_sequence.shape[0]}"
-                assert len(ohe_sequence.shape) == 2, \
-                    f"Expected 2D shape for sequence, but got {ohe_sequence.shape}"
+                assert (
+                    ohe_sequence.shape[0] == 4
+                ), f"Expected 4 channels, but got {ohe_sequence.shape[0]}"
+                assert (
+                    len(ohe_sequence.shape) == 2
+                ), f"Expected 2D shape for sequence, but got {ohe_sequence.shape}"
 
                 # Add processed pair to the data list
                 self.data.append((ohe_sequence, hic_vector))

@@ -13,6 +13,7 @@ from fvcore.nn.precise_bn import update_bn_stats
 # Utility Functions
 # =============================================================================
 
+
 def data_loader_for_precise_bn(loader, device):
     """
     Generator wrapper for precise BatchNorm statistics computation.
@@ -49,6 +50,7 @@ def compute_loss(output, target):
 # =============================================================================
 # Training and Validation Functions
 # =============================================================================
+
 
 def train_epoch(model, device, train_loader, optimizer, epoch, args):
     """
@@ -100,24 +102,26 @@ def train_epoch(model, device, train_loader, optimizer, epoch, args):
 
         # Logging
         if batch_idx % args.log_interval == 0:
-            print(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} '
-                  f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
+            print(
+                f"Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} "
+                f"({100.0 * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}"
+            )
 
             if args.dry_run:
                 break
 
     # Report NaN statistics
     nan_frac = total_nans / total_vals if total_vals > 0 else 0
-    print(f'Training NaN fraction: {nan_frac:.2%} ({total_nans}/{total_vals})')
+    print(f"Training NaN fraction: {nan_frac:.2%} ({total_nans}/{total_vals})")
 
     avg_loss = total_loss / max(num_batches, 1)
 
     # Update BatchNorm statistics with precise estimation
-    print('Updating BatchNorm statistics with preciseBN...')
+    print("Updating BatchNorm statistics with preciseBN...")
     update_bn_stats(
         model,
         data_loader_for_precise_bn(train_loader, device),
-        num_iters=min(len(train_loader), 200)
+        num_iters=min(len(train_loader), 200),
     )
 
     return avg_loss
@@ -157,10 +161,10 @@ def validate(model, device, val_loader):
 
     # Report NaN statistics
     nan_frac = total_nans / total_vals if total_vals > 0 else 0
-    print(f'Validation NaN fraction: {nan_frac:.2%} ({total_nans}/{total_vals})')
+    print(f"Validation NaN fraction: {nan_frac:.2%} ({total_nans}/{total_vals})")
 
     avg_loss = total_loss / max(num_batches, 1)
-    print(f'Validation set: Average MSE loss: {avg_loss:.4f}\n')
+    print(f"Validation set: Average MSE loss: {avg_loss:.4f}\n")
 
     return avg_loss
 

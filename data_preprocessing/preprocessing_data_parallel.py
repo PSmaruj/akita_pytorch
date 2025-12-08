@@ -12,7 +12,6 @@ tensors suitable for training the Akita model. It handles:
 The output is saved as .pt files containing (sequence, contact_matrix) pairs.
 """
 
-
 import argparse
 import logging
 import os
@@ -37,6 +36,7 @@ from pyfaidx import Fasta
 # DNA Sequence Processing
 # =============================================================================
 
+
 def one_hot_encode_sequence(sequence_obj):
     """
     One-hot encode a DNA sequence.
@@ -52,13 +52,12 @@ def one_hot_encode_sequence(sequence_obj):
         Unknown bases (N, etc.) are randomly assigned to A, C, G, or T
     """
     sequence = str(sequence_obj).upper()
-    base_to_int = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
+    base_to_int = {"A": 0, "C": 1, "G": 2, "T": 3}
 
     # Convert sequence to integer indices, random base for unknowns
-    encoded_sequence = np.array([
-        base_to_int.get(base, base_to_int[random.choice("ACGT")])
-        for base in sequence
-    ])
+    encoded_sequence = np.array(
+        [base_to_int.get(base, base_to_int[random.choice("ACGT")]) for base in sequence]
+    )
 
     # Create one-hot encoding
     one_hot_encoded = np.zeros((4, len(encoded_sequence)), dtype=np.float32)
@@ -84,12 +83,11 @@ def extract_coordinates_from_mseq(mseq_str):
     match = re.match(r"(?P<chrom>\w+):(?P<start>\d+)-(?P<end>\d+)", mseq_str)
 
     if not match:
-        raise ValueError(f"Invalid coordinate format: {mseq_str}. "
-                        f"Expected format: chr:start-end")
+        raise ValueError(f"Invalid coordinate format: {mseq_str}. Expected format: chr:start-end")
 
-    chrom = match.group('chrom')
-    start = int(match.group('start'))
-    end = int(match.group('end'))
+    chrom = match.group("chrom")
+    start = int(match.group("start"))
+    end = int(match.group("end"))
 
     return chrom, start, end
 
@@ -98,8 +96,16 @@ def extract_coordinates_from_mseq(mseq_str):
 # Hi-C Matrix Processing
 # =============================================================================
 
-def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
-                       padding=64, kernel_stddev=1, bin_size=2048, gaps_df=None):
+
+def process_hic_matrix(
+    genome_hic_cool,
+    mseq_str,
+    diagonal_offset=2,
+    padding=64,
+    kernel_stddev=1,
+    bin_size=2048,
+    gaps_df=None,
+):
     """
     Process a Hi-C contact matrix for a given genomic region.
 
@@ -141,8 +147,9 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
 
     # Quality check: skip if too many bins filtered
     if num_filtered_bins > (0.5 * len(seq_hic_nan)):
-        logging.warning(f"Skipping {mseq_str}: >50% bins filtered "
-                       f"({num_filtered_bins}/{len(seq_hic_nan)})")
+        logging.warning(
+            f"Skipping {mseq_str}: >50% bins filtered ({num_filtered_bins}/{len(seq_hic_nan)})"
+        )
         raise ValueError("Too many filtered bins")
 
     # Create masks for NaN rows and columns
@@ -155,18 +162,24 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
 
     # Mask gap regions if provided
     if gaps_df is not None:
-        gaps_chr = gaps_df[gaps_df['chr'] == chrom]
+        gaps_chr = gaps_df[gaps_df["chr"] == chrom]
 
         for _, gap in gaps_chr.iterrows():
-            gap_start = gap['start']
-            gap_end = gap['end']
+            gap_start = gap["start"]
+            gap_end = gap["end"]
 
             # Check for overlap with current region
             if (gap_start < end) and (gap_end > start):
                 # Convert genomic coordinates to matrix indices
                 gap_start_idx = max(gap_start - start, 0) // bin_size
-                gap_end_idx = min(gap_end - start, seq_hic_raw.shape[0] * bin_size,
-                                 seq_hic_raw.shape[0] * bin_size) // bin_size
+                gap_end_idx = (
+                    min(
+                        gap_end - start,
+                        seq_hic_raw.shape[0] * bin_size,
+                        seq_hic_raw.shape[0] * bin_size,
+                    )
+                    // bin_size
+                )
 
                 # Update masks for gap regions
                 row_nan_mask[gap_start_idx:gap_end_idx] = True
@@ -188,10 +201,7 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
 
     # Adaptive coarsegraining based on raw counts
     seq_hic_smoothed = adaptive_coarsegrain(
-        seq_hic_raw,
-        genome_hic_cool.matrix(balance=False).fetch(mseq_str),
-        cutoff=2,
-        max_levels=8
+        seq_hic_raw, genome_hic_cool.matrix(balance=False).fetch(mseq_str), cutoff=2, max_levels=8
     )
 
     seq_hic_nan = np.isnan(seq_hic_smoothed)
@@ -246,6 +256,7 @@ def upper_triangular_to_vector(matrix, dim=512, diag_offset=2):
 # Dataset Generation
 # =============================================================================
 
+
 def generate_and_save_dataset(args_tuple):
     """
     Process and save one fold of the dataset.
@@ -292,7 +303,7 @@ def generate_and_save_dataset(args_tuple):
         mseq_str = f"{chrom}:{start}-{end}"
 
         if (i + 1) % 10 == 0:
-            logging.info(f"[Fold {fold}] Progress: {i+1}/{len(df_fold)}")
+            logging.info(f"[Fold {fold}] Progress: {i + 1}/{len(df_fold)}")
 
         try:
             # Process DNA sequence
@@ -300,25 +311,14 @@ def generate_and_save_dataset(args_tuple):
             ohe_sequence = one_hot_encode_sequence(sequence)
 
             # Process Hi-C matrix
-            matrix = process_hic_matrix(
-                genome_hic_cool,
-                mseq_str,
-                bin_size=2048,
-                gaps_df=gaps_df
-            )
+            matrix = process_hic_matrix(genome_hic_cool, mseq_str, bin_size=2048, gaps_df=gaps_df)
 
             # Convert to upper triangular vector
             hic_vector = upper_triangular_to_vector(matrix)
 
             # Convert to PyTorch tensors
-            ohe_tensor = torch.tensor(
-                ohe_sequence.squeeze(0),
-                dtype=torch.float32
-            )
-            hic_tensor = torch.tensor(
-                hic_vector,
-                dtype=torch.float32
-            ).unsqueeze(0)
+            ohe_tensor = torch.tensor(ohe_sequence.squeeze(0), dtype=torch.float32)
+            hic_tensor = torch.tensor(hic_vector, dtype=torch.float32).unsqueeze(0)
 
             data_list.append((ohe_tensor, hic_tensor))
 
@@ -326,8 +326,7 @@ def generate_and_save_dataset(args_tuple):
             if (i + 1) % 100 == 0 or i == len(df_fold) - 1:
                 output_file = f"{output_dir}/fold{fold}_{file_count}.pt"
                 torch.save(data_list, output_file)
-                logging.info(f"[Fold {fold}] Saved {len(data_list)} samples "
-                           f"to {output_file}")
+                logging.info(f"[Fold {fold}] Saved {len(data_list)} samples to {output_file}")
                 data_list = []
                 file_count += 1
 
@@ -342,70 +341,44 @@ def generate_and_save_dataset(args_tuple):
 # Main
 # =============================================================================
 
+
 def main():
     """Parse arguments and run parallel preprocessing."""
     parser = argparse.ArgumentParser(
         description="Preprocess Hi-C and DNA sequences for Akita training",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     # Required arguments
-    parser.add_argument(
-        "--cool_file",
-        required=True,
-        help="Path to .cool Hi-C file"
-    )
-    parser.add_argument(
-        "--output_dir",
-        required=True,
-        help="Directory to save output .pt files"
-    )
-    parser.add_argument(
-        "--fasta_file",
-        required=True,
-        help="Reference genome FASTA file"
-    )
+    parser.add_argument("--cool_file", required=True, help="Path to .cool Hi-C file")
+    parser.add_argument("--output_dir", required=True, help="Directory to save output .pt files")
+    parser.add_argument("--fasta_file", required=True, help="Reference genome FASTA file")
     parser.add_argument(
         "--bed_file",
         required=True,
-        help="BED file with regions and fold assignments (chr, start, end, fold)"
+        help="BED file with regions and fold assignments (chr, start, end, fold)",
     )
 
     # Optional arguments
+    parser.add_argument("--bin_size", type=int, default=2048, help="Bin size for Hi-C processing")
     parser.add_argument(
-        "--bin_size",
-        type=int,
-        default=2048,
-        help="Bin size for Hi-C processing"
+        "--gaps_file", default=None, help="BED file of gap regions to mask (chr, start, end)"
     )
+    parser.add_argument("--start_fold", type=int, default=0, help="First fold index to process")
     parser.add_argument(
-        "--gaps_file",
-        default=None,
-        help="BED file of gap regions to mask (chr, start, end)"
-    )
-    parser.add_argument(
-        "--start_fold",
-        type=int,
-        default=0,
-        help="First fold index to process"
-    )
-    parser.add_argument(
-        "--end_fold",
-        type=int,
-        default=7,
-        help="Last fold index to process (inclusive)"
+        "--end_fold", type=int, default=7, help="Last fold index to process (inclusive)"
     )
     parser.add_argument(
         "--num_workers",
         type=int,
         default=min(4, cpu_count()),
-        help="Number of parallel worker processes"
+        help="Number of parallel worker processes",
     )
     parser.add_argument(
         "--log_level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Logging level"
+        help="Logging level",
     )
 
     args = parser.parse_args()
@@ -414,7 +387,7 @@ def main():
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - [%(levelname)s] - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     logging.info("=" * 70)
@@ -431,30 +404,19 @@ def main():
 
     # Load input data
     logging.info("Loading BED file...")
-    df = pd.read_csv(
-        args.bed_file,
-        sep="\t",
-        header=None,
-        names=["chrom", "start", "end", "fold"]
-    )
+    df = pd.read_csv(args.bed_file, sep="\t", header=None, names=["chrom", "start", "end", "fold"])
     logging.info(f"Loaded {len(df)} regions")
 
     # Load gaps file if provided
     gaps_df = None
     if args.gaps_file:
         logging.info(f"Loading gaps file: {args.gaps_file}")
-        gaps_df = pd.read_csv(
-            args.gaps_file,
-            sep="\t",
-            header=None,
-            names=['chr', 'start', 'end']
-        )
+        gaps_df = pd.read_csv(args.gaps_file, sep="\t", header=None, names=["chr", "start", "end"])
         logging.info(f"Loaded {len(gaps_df)} gap regions")
 
     # Prepare arguments for parallel processing
     fold_args = [
-        (fold, df, args.fasta_file, args.cool_file, args.output_dir,
-         gaps_df, args.bin_size)
+        (fold, df, args.fasta_file, args.cool_file, args.output_dir, gaps_df, args.bin_size)
         for fold in range(args.start_fold, args.end_fold + 1)
     ]
 

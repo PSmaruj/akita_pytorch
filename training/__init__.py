@@ -16,9 +16,9 @@ from .training_utils import (
 )
 
 __all__ = [
-    'data_loader_for_precise_bn',
-    'compute_loss',
-    'train_epoch',
-    'validate',
-    'compute_initial_losses'
+    "data_loader_for_precise_bn",
+    "compute_loss",
+    "train_epoch",
+    "validate",
+    "compute_initial_losses",
 ]

@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 
-def load_loss_file(organism, dataset_name, model_idx, base_path, training_type='finetuned'):
+def load_loss_file(organism, dataset_name, model_idx, base_path, training_type="finetuned"):
     """
     Load loss CSV file for a specific model.
 
@@ -50,7 +50,7 @@ def load_loss_file(organism, dataset_name, model_idx, base_path, training_type='
         return None
 
 
-def find_all_models(organism, dataset_name, base_path, training_type='finetuned'):
+def find_all_models(organism, dataset_name, base_path, training_type="finetuned"):
     """
     Find all available model loss files for a dataset.
 
@@ -105,23 +105,30 @@ def plot_single_model(df, model_idx, dataset_name, figsize=(10, 5)):
     """
     fig, ax = plt.subplots(figsize=figsize)
 
-    ax.plot(df['Epoch'], df['Train Loss'],
-            label='Train Loss', linewidth=2, marker='o', markersize=3)
-    ax.plot(df['Epoch'], df['Validation Loss'],
-            label='Validation Loss', linewidth=2, marker='s', markersize=3)
+    ax.plot(
+        df["Epoch"], df["Train Loss"], label="Train Loss", linewidth=2, marker="o", markersize=3
+    )
+    ax.plot(
+        df["Epoch"],
+        df["Validation Loss"],
+        label="Validation Loss",
+        linewidth=2,
+        marker="s",
+        markersize=3,
+    )
 
-    ax.set_xlabel('Epoch', fontsize=12)
-    ax.set_ylabel('Loss (MSE)', fontsize=12)
-    ax.set_title(f'Loss Curves: {dataset_name} (Model {model_idx})',
-                 fontsize=14, fontweight='bold')
+    ax.set_xlabel("Epoch", fontsize=12)
+    ax.set_ylabel("Loss (MSE)", fontsize=12)
+    ax.set_title(f"Loss Curves: {dataset_name} (Model {model_idx})", fontsize=14, fontweight="bold")
     ax.legend(fontsize=11)
-    ax.grid(True, linestyle='--', alpha=0.7)
+    ax.grid(True, linestyle="--", alpha=0.7)
 
     # Find best epoch (minimum validation loss)
-    best_epoch = df.loc[df['Validation Loss'].idxmin(), 'Epoch']
-    best_val_loss = df['Validation Loss'].min()
-    ax.axvline(x=best_epoch, color='red', linestyle=':',
-               label=f'Best (Epoch {best_epoch:.0f})', alpha=0.7)
+    best_epoch = df.loc[df["Validation Loss"].idxmin(), "Epoch"]
+    best_val_loss = df["Validation Loss"].min()
+    ax.axvline(
+        x=best_epoch, color="red", linestyle=":", label=f"Best (Epoch {best_epoch:.0f})", alpha=0.7
+    )
     ax.legend(fontsize=11)
 
     plt.tight_layout()
@@ -129,8 +136,9 @@ def plot_single_model(df, model_idx, dataset_name, figsize=(10, 5)):
     return fig, ax, best_epoch, best_val_loss
 
 
-def plot_all_models(organism, dataset_name, model_indices, base_path,
-                    training_type='finetuned', figsize_per_plot=6):
+def plot_all_models(
+    organism, dataset_name, model_indices, base_path, training_type="finetuned", figsize_per_plot=6
+):
     """
     Plot loss curves for all models in a grid of subplots.
 
@@ -152,10 +160,7 @@ def plot_all_models(organism, dataset_name, model_indices, base_path,
     n_cols = min(3, n_models)
     n_rows = int(np.ceil(n_models / n_cols))
 
-    fig, axes = plt.subplots(
-        n_rows, n_cols,
-        figsize=(figsize_per_plot * n_cols, 4 * n_rows)
-    )
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(figsize_per_plot * n_cols, 4 * n_rows))
 
     # Handle single subplot case
     if n_models == 1:
@@ -173,54 +178,58 @@ def plot_all_models(organism, dataset_name, model_indices, base_path,
         df = load_loss_file(organism, dataset_name, model_idx, base_path, training_type)
 
         if df is None:
-            ax.text(0.5, 0.5, f'Model {model_idx}\nData not found',
-                   ha='center', va='center', fontsize=12)
+            ax.text(
+                0.5,
+                0.5,
+                f"Model {model_idx}\nData not found",
+                ha="center",
+                va="center",
+                fontsize=12,
+            )
             ax.set_xticks([])
             ax.set_yticks([])
             continue
 
         # Plot
-        ax.plot(df['Epoch'], df['Train Loss'],
-               label='Train', linewidth=2, alpha=0.8)
-        ax.plot(df['Epoch'], df['Validation Loss'],
-               label='Validation', linewidth=2, alpha=0.8)
+        ax.plot(df["Epoch"], df["Train Loss"], label="Train", linewidth=2, alpha=0.8)
+        ax.plot(df["Epoch"], df["Validation Loss"], label="Validation", linewidth=2, alpha=0.8)
 
         # Mark best epoch
-        best_epoch = df.loc[df['Validation Loss'].idxmin(), 'Epoch']
-        best_val_loss = df['Validation Loss'].min()
-        ax.axvline(x=best_epoch, color='red', linestyle=':', alpha=0.5)
+        best_epoch = df.loc[df["Validation Loss"].idxmin(), "Epoch"]
+        best_val_loss = df["Validation Loss"].min()
+        ax.axvline(x=best_epoch, color="red", linestyle=":", alpha=0.5)
 
         all_best_epochs.append(best_epoch)
         all_best_losses.append(best_val_loss)
 
         # Formatting
-        ax.set_xlabel('Epoch', fontsize=10)
-        ax.set_ylabel('Loss (MSE)', fontsize=10)
+        ax.set_xlabel("Epoch", fontsize=10)
+        ax.set_ylabel("Loss (MSE)", fontsize=10)
         ax.set_title(
-            f'Model {model_idx}\n(Best: {best_val_loss:.5f} @ Epoch {best_epoch:.0f})',
-            fontsize=11, fontweight='bold'
+            f"Model {model_idx}\n(Best: {best_val_loss:.5f} @ Epoch {best_epoch:.0f})",
+            fontsize=11,
+            fontweight="bold",
         )
         ax.legend(fontsize=9)
-        ax.grid(True, linestyle='--', alpha=0.5)
+        ax.grid(True, linestyle="--", alpha=0.5)
 
     # Hide unused subplots
     for i in range(n_models, len(axes)):
-        axes[i].axis('off')
+        axes[i].axis("off")
 
-    plt.suptitle(f'Loss Curves: {dataset_name}',
-                fontsize=16, fontweight='bold', y=1.00)
+    plt.suptitle(f"Loss Curves: {dataset_name}", fontsize=16, fontweight="bold", y=1.00)
     plt.tight_layout()
 
     # Summary statistics
     summary_stats = {
-        'best_losses': all_best_losses,
-        'best_epochs': all_best_epochs,
-        'best_model_idx': model_indices[np.argmin(all_best_losses)] if all_best_losses else None,
-        'worst_model_idx': model_indices[np.argmax(all_best_losses)] if all_best_losses else None,
-        'mean_loss': np.mean(all_best_losses) if all_best_losses else None,
-        'std_loss': np.std(all_best_losses) if all_best_losses else None,
-        'mean_epoch': np.mean(all_best_epochs) if all_best_epochs else None,
-        'std_epoch': np.std(all_best_epochs) if all_best_epochs else None
+        "best_losses": all_best_losses,
+        "best_epochs": all_best_epochs,
+        "best_model_idx": model_indices[np.argmin(all_best_losses)] if all_best_losses else None,
+        "worst_model_idx": model_indices[np.argmax(all_best_losses)] if all_best_losses else None,
+        "mean_loss": np.mean(all_best_losses) if all_best_losses else None,
+        "std_loss": np.std(all_best_losses) if all_best_losses else None,
+        "mean_epoch": np.mean(all_best_epochs) if all_best_epochs else None,
+        "std_epoch": np.std(all_best_epochs) if all_best_epochs else None,
     }
 
     return fig, axes, summary_stats
@@ -235,27 +244,34 @@ def print_summary_statistics(dataset_name, model_indices, summary_stats):
         model_indices (list): List of model indices
         summary_stats (dict): Dictionary with summary statistics from plot_all_models
     """
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print(f"Summary Statistics for {dataset_name}")
-    print("="*70)
+    print("=" * 70)
     print(f"Number of models: {len(model_indices)}")
 
-    if summary_stats['best_model_idx'] is not None:
-        print(f"Best validation loss: {min(summary_stats['best_losses']):.6f} "
-              f"(Model {summary_stats['best_model_idx']})")
-        print(f"Worst validation loss: {max(summary_stats['best_losses']):.6f} "
-              f"(Model {summary_stats['worst_model_idx']})")
-        print(f"Mean validation loss: {summary_stats['mean_loss']:.6f} ± "
-              f"{summary_stats['std_loss']:.6f}")
-        print(f"Mean best epoch: {summary_stats['mean_epoch']:.1f} ± "
-              f"{summary_stats['std_epoch']:.1f}")
+    if summary_stats["best_model_idx"] is not None:
+        print(
+            f"Best validation loss: {min(summary_stats['best_losses']):.6f} "
+            f"(Model {summary_stats['best_model_idx']})"
+        )
+        print(
+            f"Worst validation loss: {max(summary_stats['best_losses']):.6f} "
+            f"(Model {summary_stats['worst_model_idx']})"
+        )
+        print(
+            f"Mean validation loss: {summary_stats['mean_loss']:.6f} ± "
+            f"{summary_stats['std_loss']:.6f}"
+        )
+        print(
+            f"Mean best epoch: {summary_stats['mean_epoch']:.1f} ± {summary_stats['std_epoch']:.1f}"
+        )
     else:
         print("No valid data found")
 
-    print("="*70)
+    print("=" * 70)
 
 
-def compare_datasets(organism, dataset_names, base_path, training_type='finetuned'):
+def compare_datasets(organism, dataset_names, base_path, training_type="finetuned"):
     """
     Compare best validation losses across multiple datasets.
 
@@ -277,12 +293,10 @@ def compare_datasets(organism, dataset_names, base_path, training_type='finetune
         for model_idx in model_indices:
             df = load_loss_file(organism, dataset, model_idx, base_path, training_type)
             if df is not None:
-                best_val_loss = df['Validation Loss'].min()
-                comparison_data.append({
-                    'Dataset': dataset,
-                    'Model': model_idx,
-                    'Best Val Loss': best_val_loss
-                })
+                best_val_loss = df["Validation Loss"].min()
+                comparison_data.append(
+                    {"Dataset": dataset, "Model": model_idx, "Best Val Loss": best_val_loss}
+                )
 
     return pd.DataFrame(comparison_data)
 
@@ -300,19 +314,26 @@ def plot_dataset_comparison(comparison_df, figsize=(12, 6)):
     """
     fig, ax = plt.subplots(figsize=figsize)
 
-    datasets = comparison_df['Dataset'].unique()
+    datasets = comparison_df["Dataset"].unique()
 
     for dataset in datasets:
-        data = comparison_df[comparison_df['Dataset'] == dataset]
-        ax.plot(data['Model'], data['Best Val Loss'],
-                marker='o', linewidth=2, label=dataset, markersize=8)
+        data = comparison_df[comparison_df["Dataset"] == dataset]
+        ax.plot(
+            data["Model"],
+            data["Best Val Loss"],
+            marker="o",
+            linewidth=2,
+            label=dataset,
+            markersize=8,
+        )
 
-    ax.set_xlabel('Model Index', fontsize=12)
-    ax.set_ylabel('Best Validation Loss', fontsize=12)
-    ax.set_title('Comparison of Best Validation Losses Across Datasets',
-                 fontsize=14, fontweight='bold')
+    ax.set_xlabel("Model Index", fontsize=12)
+    ax.set_ylabel("Best Validation Loss", fontsize=12)
+    ax.set_title(
+        "Comparison of Best Validation Losses Across Datasets", fontsize=14, fontweight="bold"
+    )
     ax.legend(fontsize=11)
-    ax.grid(True, linestyle='--', alpha=0.7)
+    ax.grid(True, linestyle="--", alpha=0.7)
 
     plt.tight_layout()
 

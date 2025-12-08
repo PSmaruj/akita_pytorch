@@ -11,8 +11,9 @@ import seaborn as sns
 import torch
 
 
-def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r",
-                     width=5, height=5, title=None, show_colorbar=True):
+def plot_contact_map(
+    matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r", width=5, height=5, title=None, show_colorbar=True
+):
     """
     Plot a Hi-C contact matrix as a heatmap.
 
@@ -31,7 +32,7 @@ def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r",
     """
     fig, ax = plt.subplots(1, 1, figsize=(width, height))
 
-    cbar_kws = {'label': 'Log(Obs/Exp)'} if show_colorbar else None
+    cbar_kws = {"label": "Log(Obs/Exp)"} if show_colorbar else None
 
     sns.heatmap(
         matrix,
@@ -43,7 +44,7 @@ def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r",
         xticklabels=False,
         yticklabels=False,
         ax=ax,
-        cbar_kws=cbar_kws
+        cbar_kws=cbar_kws,
     )
 
     if title:
@@ -152,9 +153,9 @@ def plot_comparison(target_matrix, pred_matrix, sample_idx=0, vmin=-0.6, vmax=0.
         xticklabels=False,
         yticklabels=False,
         ax=axes[0],
-        cbar_kws={'label': 'Log(Obs/Exp)'}
+        cbar_kws={"label": "Log(Obs/Exp)"},
     )
-    axes[0].set_title(f'Ground Truth (Sample {sample_idx})', fontsize=12, fontweight='bold')
+    axes[0].set_title(f"Ground Truth (Sample {sample_idx})", fontsize=12, fontweight="bold")
 
     # Prediction
     sns.heatmap(
@@ -167,17 +168,18 @@ def plot_comparison(target_matrix, pred_matrix, sample_idx=0, vmin=-0.6, vmax=0.
         xticklabels=False,
         yticklabels=False,
         ax=axes[1],
-        cbar_kws={'label': 'Log(Obs/Exp)'}
+        cbar_kws={"label": "Log(Obs/Exp)"},
     )
-    axes[1].set_title(f'Prediction (Sample {sample_idx})', fontsize=12, fontweight='bold')
+    axes[1].set_title(f"Prediction (Sample {sample_idx})", fontsize=12, fontweight="bold")
 
     plt.tight_layout()
 
     return fig, axes
 
 
-def plot_matrix_grid(matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6,
-                     suptitle=None, figsize_per_plot=4):
+def plot_matrix_grid(
+    matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6, suptitle=None, figsize_per_plot=4
+):
     """
     Plot multiple contact matrices in a grid.
 
@@ -197,8 +199,7 @@ def plot_matrix_grid(matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6,
     n_rows = int(np.ceil(n_samples / n_cols))
 
     fig, axes = plt.subplots(
-        n_rows, n_cols,
-        figsize=(figsize_per_plot * n_cols, figsize_per_plot * n_rows)
+        n_rows, n_cols, figsize=(figsize_per_plot * n_cols, figsize_per_plot * n_rows)
     )
 
     # Handle single subplot case
@@ -218,20 +219,20 @@ def plot_matrix_grid(matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6,
             square=True,
             xticklabels=False,
             yticklabels=False,
-            ax=ax
+            ax=ax,
         )
 
         if titles and idx < len(titles):
             ax.set_title(titles[idx], fontsize=10)
         else:
-            ax.set_title(f'Sample {idx}', fontsize=10)
+            ax.set_title(f"Sample {idx}", fontsize=10)
 
     # Hide unused subplots
     for idx in range(n_samples, len(axes)):
-        axes[idx].axis('off')
+        axes[idx].axis("off")
 
     if suptitle:
-        plt.suptitle(suptitle, fontsize=14, fontweight='bold', y=1.00)
+        plt.suptitle(suptitle, fontsize=14, fontweight="bold", y=1.00)
 
     plt.tight_layout()
 

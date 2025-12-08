@@ -11,7 +11,6 @@ genome folding prediction, including:
 - Output processing layers (UpperTri, Final)
 """
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as f
@@ -48,8 +47,7 @@ class StochasticReverseComplement(nn.Module):
             # Reverse complement: rearrange channels (A->T, C->G, G->C, T->A)
             # Channels are [A, C, G, T] -> reverse to [T, G, C, A]
             rc_seq_1hot = seq_1hot.index_select(
-                dim=1,
-                index=torch.tensor([3, 2, 1, 0], device=device)
+                dim=1, index=torch.tensor([3, 2, 1, 0], device=device)
             )
 
             # Flip the sequence along the sequence axis
@@ -59,19 +57,11 @@ class StochasticReverseComplement(nn.Module):
             reverse_bool = torch.rand(seq_1hot.size(0), device=device) > 0.5
 
             # Apply reverse complement to selected sequences
-            result = torch.where(
-                reverse_bool[:, None, None],
-                rc_seq_1hot,
-                seq_1hot
-            )
+            result = torch.where(reverse_bool[:, None, None], rc_seq_1hot, seq_1hot)
         else:
             # In eval mode, keep the sequence unchanged
             result = seq_1hot
-            reverse_bool = torch.zeros(
-                seq_1hot.size(0),
-                device=device,
-                dtype=torch.bool
-            )
+            reverse_bool = torch.zeros(seq_1hot.size(0), device=device, dtype=torch.bool)
 
         # Return both the modified sequence and the reverse decision flag
         return result, reverse_bool
@@ -97,7 +87,8 @@ class StochasticShift(nn.Module):
     Output shape:
         (batch_size, 4, sequence_length)
     """
-    def __init__(self, shift_max=0, symmetric=True, pad='constant'):
+
+    def __init__(self, shift_max=0, symmetric=True, pad="constant"):
         super().__init__()
         self.shift_max = shift_max
         self.symmetric = symmetric
@@ -145,17 +136,14 @@ class StochasticShift(nn.Module):
 
         # Sample random shifts for each sequence in batch
         shift_indices = torch.randint(
-            len(self.augment_shifts),
-            size=(seq_1hot.size(0),),
-            device=device
+            len(self.augment_shifts), size=(seq_1hot.size(0),), device=device
         )
         shifts = self.augment_shifts[shift_indices]
 
         # Apply shifts
-        shifted_seq_1hot = torch.stack([
-            self.shift_sequence(seq_1hot[i], shifts[i])
-            for i in range(seq_1hot.size(0))
-        ])
+        shifted_seq_1hot = torch.stack(
+            [self.shift_sequence(seq_1hot[i], shifts[i]) for i in range(seq_1hot.size(0))]
+        )
 
         return shifted_seq_1hot
 
@@ -178,10 +166,20 @@ class ConvBlock(nn.Module):
         use_dropout (bool): Whether to apply dropout. Default: True
     """
 
-    def __init__(self, in_channels, filters, kernel_size, stride=1,
-                 dilation_rate=1, pool_size=1, pool_type='max',
-                 norm_type=None, bn_momentum=0.1, dropout_prob=0.4,
-                 use_dropout=True):
+    def __init__(
+        self,
+        in_channels,
+        filters,
+        kernel_size,
+        stride=1,
+        dilation_rate=1,
+        pool_size=1,
+        pool_type="max",
+        norm_type=None,
+        bn_momentum=0.1,
+        dropout_prob=0.4,
+        use_dropout=True,
+    ):
         super().__init__()
 
         # Convolution Layer
@@ -192,17 +190,18 @@ class ConvBlock(nn.Module):
             stride=stride,
             padding=(kernel_size // 2),
             dilation=dilation_rate,
-            bias=False)
+            bias=False,
+        )
 
         # Normalization
-        self.batch_norm = nn.BatchNorm1d(
-            filters,
-            eps=0.001,
-            momentum=bn_momentum
-        ) if norm_type == 'batch' else None
+        self.batch_norm = (
+            nn.BatchNorm1d(filters, eps=0.001, momentum=bn_momentum)
+            if norm_type == "batch"
+            else None
+        )
 
         # Pooling
-        self.pool = nn.MaxPool1d(pool_size) if pool_type == 'max' else None
+        self.pool = nn.MaxPool1d(pool_size) if pool_type == "max" else None
 
         # Dropout (Optional)
         self.use_dropout = use_dropout
@@ -241,8 +240,17 @@ class ConvTower(nn.Module):
         bn_momentum (float): Batch normalization momentum. Default: 0.1
     """
 
-    def __init__(self, in_channels, filters_init, filters_mult, kernel_size,
-                 pool_size, repeat, norm_type='batch', bn_momentum=0.1):
+    def __init__(
+        self,
+        in_channels,
+        filters_init,
+        filters_mult,
+        kernel_size,
+        pool_size,
+        repeat,
+        norm_type="batch",
+        bn_momentum=0.1,
+    ):
         super().__init__()
 
         layers = []
@@ -253,13 +261,15 @@ class ConvTower(nn.Module):
             layers.append(nn.ReLU())
 
             # Convolution
-            layers.append(nn.Conv1d(
-                in_channels=in_channels if i == 0 else int(filters),
-                out_channels=int(filters),
-                kernel_size=kernel_size,
-                padding=kernel_size // 2,
-                bias=False
-            ))
+            layers.append(
+                nn.Conv1d(
+                    in_channels=in_channels if i == 0 else int(filters),
+                    out_channels=int(filters),
+                    kernel_size=kernel_size,
+                    padding=kernel_size // 2,
+                    bias=False,
+                )
+            )
 
             # Normalization
             if norm_type == "batch":
@@ -293,8 +303,15 @@ class ResidualDilatedBlock1D(nn.Module):
         norm_type (str): Normalization type ('batch' or None). Default: 'batch'
     """
 
-    def __init__(self, in_channels, mid_channels, dropout_rate=0.4,
-                 dilation_rate=1, bn_momentum=0.1, norm_type='batch'):
+    def __init__(
+        self,
+        in_channels,
+        mid_channels,
+        dropout_rate=0.4,
+        dilation_rate=1,
+        bn_momentum=0.1,
+        norm_type="batch",
+    ):
         super().__init__()
 
         self.relu1 = nn.ReLU()
@@ -304,29 +321,23 @@ class ResidualDilatedBlock1D(nn.Module):
             kernel_size=3,
             padding=dilation_rate,
             dilation=dilation_rate,
-            bias=False
+            bias=False,
         )
 
-        self.norm1 = nn.BatchNorm1d(
-            mid_channels,
-            eps=0.001,
-            momentum=bn_momentum
-        ) if norm_type == 'batch' else None
+        self.norm1 = (
+            nn.BatchNorm1d(mid_channels, eps=0.001, momentum=bn_momentum)
+            if norm_type == "batch"
+            else None
+        )
 
         self.relu2 = nn.ReLU()
-        self.conv2 = nn.Conv1d(
-            mid_channels,
-            in_channels,
-            kernel_size=1,
-            padding=0,
-            bias=False
-        )
+        self.conv2 = nn.Conv1d(mid_channels, in_channels, kernel_size=1, padding=0, bias=False)
 
-        self.norm2 = nn.BatchNorm1d(
-            in_channels,
-            eps=0.001,
-            momentum=bn_momentum
-        ) if norm_type == 'batch' else None
+        self.norm2 = (
+            nn.BatchNorm1d(in_channels, eps=0.001, momentum=bn_momentum)
+            if norm_type == "batch"
+            else None
+        )
 
         self.dropout = nn.Dropout(dropout_rate)
 
@@ -363,8 +374,9 @@ class ConvBlockReduce(nn.Module):
         norm_type (str): Normalization type ('batch', 'group', or None). Default: 'batch'
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size=5,
-                 bn_momentum=0.1, norm_type='batch'):
+    def __init__(
+        self, in_channels, out_channels, kernel_size=5, bn_momentum=0.1, norm_type="batch"
+    ):
         super().__init__()
 
         layers = [
@@ -375,16 +387,12 @@ class ConvBlockReduce(nn.Module):
                 kernel_size=kernel_size,
                 stride=1,
                 padding=kernel_size // 2,
-                bias=False
-            )
+                bias=False,
+            ),
         ]
 
-        if norm_type == 'batch':
-            layers.append(nn.BatchNorm1d(
-                out_channels,
-                eps=0.001,
-                momentum=bn_momentum
-            ))
+        if norm_type == "batch":
+            layers.append(nn.BatchNorm1d(out_channels, eps=0.001, momentum=bn_momentum))
 
         layers.append(nn.ReLU())
         self.layers = nn.Sequential(*layers)
@@ -417,12 +425,13 @@ class OneToTwo(nn.Module):
         where output_features = 2*features for 'concat', else features
     """
 
-    def __init__(self, operation='mean'):
+    def __init__(self, operation="mean"):
         super().__init__()
         self.operation = operation.lower()
-        valid_operations = ['concat', 'mean', 'max', 'multiply', 'multiply1']
-        assert self.operation in valid_operations, \
-            f"Invalid operation '{operation}'. Choose from {valid_operations}"
+        valid_operations = ["concat", "mean", "max", "multiply", "multiply1"]
+        assert (
+            self.operation in valid_operations
+        ), f"Invalid operation '{operation}'. Choose from {valid_operations}"
 
     def forward(self, oned):
         batch_size, features, seq_len = oned.shape
@@ -431,11 +440,11 @@ class OneToTwo(nn.Module):
         twod1 = oned.repeat(1, 1, seq_len).view(batch_size, features, seq_len, seq_len)
         twod2 = twod1.permute(0, 1, 3, 2)  # Transpose spatial dimensions
 
-        if self.operation == 'concat':
+        if self.operation == "concat":
             twod = torch.cat([twod1, twod2], dim=1)
-        elif self.operation == 'multiply':
+        elif self.operation == "multiply":
             twod = twod1 * twod2
-        elif self.operation == 'multiply1':
+        elif self.operation == "multiply1":
             twod = (twod1 + 1) * (twod2 + 1) - 1
         else:
             # For mean/max operations
@@ -443,9 +452,9 @@ class OneToTwo(nn.Module):
             twod2 = twod2.unsqueeze(-1)
             twod = torch.cat([twod1, twod2], dim=-1)
 
-            if self.operation == 'mean':
+            if self.operation == "mean":
                 twod = twod.mean(dim=-1)
-            elif self.operation == 'max':
+            elif self.operation == "max":
                 twod, _ = twod.max(dim=-1)
 
         return twod
@@ -471,8 +480,7 @@ class ConcatDist2D(nn.Module):
     def forward(self, inputs):
         batch_size, features, seq_len, seq_len_ = inputs.shape
 
-        assert seq_len == seq_len_, \
-            f"Input must be square, got ({seq_len}, {seq_len_})"
+        assert seq_len == seq_len_, f"Input must be square, got ({seq_len}, {seq_len_})"
 
         # Create pairwise distance matrix
         pos = torch.arange(seq_len, device=inputs.device)
@@ -500,8 +508,9 @@ class Conv2DBlock(nn.Module):
         norm_type (str): Normalization type ('batch' or None). Default: 'batch'
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size=3,
-                 bn_momentum=0.1, norm_type='batch'):
+    def __init__(
+        self, in_channels, out_channels, kernel_size=3, bn_momentum=0.1, norm_type="batch"
+    ):
         super().__init__()
 
         layers = [
@@ -511,16 +520,12 @@ class Conv2DBlock(nn.Module):
                 out_channels,
                 kernel_size=kernel_size,
                 padding=kernel_size // 2,
-                bias=False
-                )
+                bias=False,
+            ),
         ]
 
-        if norm_type == 'batch':
-            layers.append(nn.BatchNorm2d(
-                out_channels,
-                eps=0.001,
-                momentum=bn_momentum
-            ))
+        if norm_type == "batch":
+            layers.append(nn.BatchNorm2d(out_channels, eps=0.001, momentum=bn_momentum))
 
         self.block = nn.Sequential(*layers)
 
@@ -565,9 +570,16 @@ class DilatedResidualBlock2D(nn.Module):
         norm_type (str): Normalization type ('batch' or None). Default: 'batch'
     """
 
-    def __init__(self, in_channels=48, mid_channels=24, kernel_size=3,
-                 dilation_rate=1, dropout_prob=0.1, bn_momentum=0.1,
-                 norm_type='batch'):
+    def __init__(
+        self,
+        in_channels=48,
+        mid_channels=24,
+        kernel_size=3,
+        dilation_rate=1,
+        dropout_prob=0.1,
+        bn_momentum=0.1,
+        norm_type="batch",
+    ):
         super().__init__()
 
         self.relu = nn.ReLU()
@@ -579,14 +591,14 @@ class DilatedResidualBlock2D(nn.Module):
             kernel_size=kernel_size,
             padding=(kernel_size // 2) * dilation_rate,
             dilation=dilation_rate,  # Add dilation
-            bias=False
+            bias=False,
         )
 
-        self.norm1 = nn.BatchNorm2d(
-            mid_channels,
-            eps=0.001,
-            momentum=bn_momentum
-        ) if norm_type == 'batch' else None
+        self.norm1 = (
+            nn.BatchNorm2d(mid_channels, eps=0.001, momentum=bn_momentum)
+            if norm_type == "batch"
+            else None
+        )
 
         # Second convolutional layer (channel restoration)
         self.conv2 = nn.Conv2d(
@@ -595,14 +607,14 @@ class DilatedResidualBlock2D(nn.Module):
             kernel_size=1,
             padding=(1 // 2) * dilation_rate,
             dilation=dilation_rate,
-            bias=False
+            bias=False,
         )
 
-        self.norm2 = nn.BatchNorm2d(
-            in_channels,
-            eps=0.001,
-            momentum=bn_momentum
-        ) if norm_type == 'batch' else None
+        self.norm2 = (
+            nn.BatchNorm2d(in_channels, eps=0.001, momentum=bn_momentum)
+            if norm_type == "batch"
+            else None
+        )
 
         self.dropout = nn.Dropout2d(p=dropout_prob)
         self.symmetrize = Symmetrize2D()
@@ -654,8 +666,15 @@ class SqueezeExcite(nn.Module):
         (batch_size, channels, height, width)
     """
 
-    def __init__(self, in_channels, activation='relu', additive=False,
-                 bottleneck_ratio=8, norm_type=None, bn_momentum=0.9):
+    def __init__(
+        self,
+        in_channels,
+        activation="relu",
+        additive=False,
+        bottleneck_ratio=8,
+        norm_type=None,
+        bn_momentum=0.9,
+    ):
         super().__init__()
         self.activation = activation
         self.additive = additive
@@ -672,7 +691,7 @@ class SqueezeExcite(nn.Module):
         self.dense2 = nn.Linear(reduced_channels, in_channels)
 
         # Normalization
-        if norm_type == 'batch':
+        if norm_type == "batch":
             self.norm = nn.BatchNorm1d(in_channels, eps=0.001, momentum=bn_momentum)
         else:
             self.norm = None
@@ -709,15 +728,14 @@ class SqueezeExcite(nn.Module):
 
     def _activate(self, x):
         """Apply specified activation function."""
-        if self.activation == 'relu':
+        if self.activation == "relu":
             return f.relu(x)
-        elif self.activation == 'gelu':
+        elif self.activation == "gelu":
             return f.gelu(x)
-        elif self.activation == 'silu':
+        elif self.activation == "silu":
             return f.silu(x)
         else:
             raise ValueError(f"Unsupported activation: {self.activation}")
-
 
 
 class Cropping2D(nn.Module):
@@ -740,12 +758,7 @@ class Cropping2D(nn.Module):
 
     def forward(self, inputs):
         _, _, h, w = inputs.size()
-        cropped = inputs[
-            :,
-            :,
-            self.cropping:h - self.cropping,
-            self.cropping:w - self.cropping
-        ]
+        cropped = inputs[:, :, self.cropping : h - self.cropping, self.cropping : w - self.cropping]
         return cropped
 
 
@@ -782,31 +795,20 @@ class UpperTri(nn.Module):
         transformed_inputs = torch.where(
             reverse_complement_flags.view(-1, 1, 1, 1),  # Expand dims for broadcasting
             flipped_inputs,
-            inputs
+            inputs,
         )
 
         # Generate the upper triangular indices
         triu_tup = torch.triu_indices(
-            mat_size,
-            mat_size,
-            self.diagonal_offset,
-            device=inputs.device
+            mat_size, mat_size, self.diagonal_offset, device=inputs.device
         )
 
         # Convert to flattened indices
         triu_index = triu_tup[0] * mat_size + triu_tup[1]
-        triu_index = triu_index.unsqueeze(0).unsqueeze(0).expand(
-            batch_size,
-            features_dim,
-            -1
-        )
+        triu_index = triu_index.unsqueeze(0).unsqueeze(0).expand(batch_size, features_dim, -1)
 
         # Flatten input tensor and extract upper triangle
-        unroll_repr = transformed_inputs.reshape(
-            batch_size,
-            features_dim,
-            mat_size * mat_size
-        )
+        unroll_repr = transformed_inputs.reshape(batch_size, features_dim, mat_size * mat_size)
         upper_tri = torch.gather(unroll_repr, 2, triu_index)
 
         return upper_tri
@@ -833,7 +835,7 @@ class Final(nn.Module):
         For L2 regularization, use weight_decay parameter in your optimizer.
     """
 
-    def __init__(self, activation='linear', units=5, **kwargs):
+    def __init__(self, activation="linear", units=5, **kwargs):
         super().__init__()
         self.activation = activation
         self.units = units
@@ -849,11 +851,11 @@ class Final(nn.Module):
         x = x.transpose(1, 2)
 
         # Apply activation function
-        if self.activation == 'relu':
+        if self.activation == "relu":
             x = f.relu(x)
-        elif self.activation == 'gelu':
+        elif self.activation == "gelu":
             x = f.gelu(x)
-        elif self.activation == 'linear':
+        elif self.activation == "linear":
             pass  # No activation
         else:
             raise ValueError(f"Unsupported activation function: {self.activation}")
@@ -890,11 +892,7 @@ class SwitchReverseTriu(nn.Module):
         batch_size, channels, length = x.size()
 
         # Get upper triangular indices
-        torch.triu_indices(
-            self.matrix_size,
-            self.matrix_size,
-            self.diagonal_offset
-        ).to(x.device)
+        torch.triu_indices(self.matrix_size, self.matrix_size, self.diagonal_offset).to(x.device)
 
         # Flip elements based on reverse_bool
         if reverse_bool.any():
