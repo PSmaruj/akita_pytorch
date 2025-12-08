@@ -20,19 +20,18 @@ import random
 import re
 from multiprocessing import Pool, cpu_count
 
+import cooler
 import numpy as np
 import pandas as pd
 import torch
-import cooler
-from pyfaidx import Fasta
 from astropy.convolution import Gaussian2DKernel, convolve
 from cooltools.lib.numutils import (
-    observed_over_expected,
     adaptive_coarsegrain,
+    interp_nan,
+    observed_over_expected,
     set_diag,
-    interp_nan
 )
-
+from pyfaidx import Fasta
 
 # =============================================================================
 # DNA Sequence Processing
@@ -57,7 +56,7 @@ def one_hot_encode_sequence(sequence_obj):
 
     # Convert sequence to integer indices, random base for unknowns
     encoded_sequence = np.array([
-        base_to_int.get(base, base_to_int[random.choice("ACGT")]) 
+        base_to_int.get(base, base_to_int[random.choice("ACGT")])
         for base in sequence
     ])
 
@@ -83,15 +82,15 @@ def extract_coordinates_from_mseq(mseq_str):
         ValueError: If format is invalid
     """
     match = re.match(r"(?P<chrom>\w+):(?P<start>\d+)-(?P<end>\d+)", mseq_str)
-    
+
     if not match:
         raise ValueError(f"Invalid coordinate format: {mseq_str}. "
                         f"Expected format: chr:start-end")
-    
+
     chrom = match.group('chrom')
     start = int(match.group('start'))
     end = int(match.group('end'))
-    
+
     return chrom, start, end
 
 
@@ -99,7 +98,7 @@ def extract_coordinates_from_mseq(mseq_str):
 # Hi-C Matrix Processing
 # =============================================================================
 
-def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2, 
+def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
                        padding=64, kernel_stddev=1, bin_size=2048, gaps_df=None):
     """
     Process a Hi-C contact matrix for a given genomic region.
@@ -133,60 +132,60 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
     # Load balanced Hi-C matrix
     seq_hic_raw = genome_hic_cool.matrix(balance=True).fetch(mseq_str)
     chrom, start, end = extract_coordinates_from_mseq(mseq_str)
-    
+
     # Identify NaN bins (low coverage)
     seq_hic_nan = np.isnan(seq_hic_raw)
     num_filtered_bins = np.sum(np.sum(seq_hic_nan, axis=0) == len(seq_hic_nan))
-    
+
     logging.debug(f"Filtered bins in {mseq_str}: {num_filtered_bins}")
-    
+
     # Quality check: skip if too many bins filtered
     if num_filtered_bins > (0.5 * len(seq_hic_nan)):
         logging.warning(f"Skipping {mseq_str}: >50% bins filtered "
                        f"({num_filtered_bins}/{len(seq_hic_nan)})")
         raise ValueError("Too many filtered bins")
-    
+
     # Create masks for NaN rows and columns
     row_nan_mask = np.all(seq_hic_nan, axis=1)
     col_nan_mask = np.all(seq_hic_nan, axis=0)
-    
+
     # Apply NaN masks
     seq_hic_raw[row_nan_mask, :] = np.nan
     seq_hic_raw[:, col_nan_mask] = np.nan
-    
+
     # Mask gap regions if provided
     if gaps_df is not None:
         gaps_chr = gaps_df[gaps_df['chr'] == chrom]
-        
+
         for _, gap in gaps_chr.iterrows():
             gap_start = gap['start']
             gap_end = gap['end']
-            
+
             # Check for overlap with current region
             if (gap_start < end) and (gap_end > start):
                 # Convert genomic coordinates to matrix indices
                 gap_start_idx = max(gap_start - start, 0) // bin_size
-                gap_end_idx = min(gap_end - start, seq_hic_raw.shape[0] * bin_size, 
+                gap_end_idx = min(gap_end - start, seq_hic_raw.shape[0] * bin_size,
                                  seq_hic_raw.shape[0] * bin_size) // bin_size
-                
+
                 # Update masks for gap regions
                 row_nan_mask[gap_start_idx:gap_end_idx] = True
                 col_nan_mask[gap_start_idx:gap_end_idx] = True
-        
+
         # Apply updated masks
         seq_hic_raw[row_nan_mask, :] = np.nan
         seq_hic_raw[:, col_nan_mask] = np.nan
-        
+
         logging.debug(f"Gap-masked rows: {np.sum(row_nan_mask)}")
-    
+
     # Clip diagonal values and extreme outliers
     clipval = np.nanmedian(np.diag(seq_hic_raw, diagonal_offset))
     for i in range(-diagonal_offset + 1, diagonal_offset):
         set_diag(seq_hic_raw, clipval, i)
-    
+
     seq_hic_raw = np.clip(seq_hic_raw, 0, clipval)
     seq_hic_raw[seq_hic_nan] = np.nan
-    
+
     # Adaptive coarsegraining based on raw counts
     seq_hic_smoothed = adaptive_coarsegrain(
         seq_hic_raw,
@@ -196,28 +195,28 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
     )
 
     seq_hic_nan = np.isnan(seq_hic_smoothed)
-    
+
     # Calculate observed/expected and log transform
     seq_hic_obsexp = observed_over_expected(seq_hic_smoothed, ~seq_hic_nan)[0]
     log_hic_obsexp = np.log(seq_hic_obsexp)
-    
+
     # Apply padding (remove edge artifacts)
     if padding > 0:
         log_hic_obsexp = log_hic_obsexp[padding:-padding, padding:-padding]
         row_nan_mask = row_nan_mask[padding:-padding]
         col_nan_mask = col_nan_mask[padding:-padding]
-    
+
     # Interpolate remaining NaNs
     log_hic_obsexp = interp_nan(log_hic_obsexp)
-    
+
     # Zero out near-diagonal elements
     for i in range(-diagonal_offset + 1, diagonal_offset):
         set_diag(log_hic_obsexp, 0, i)
 
     # Apply Gaussian smoothing
     kernel = Gaussian2DKernel(x_stddev=kernel_stddev)
-    seq_hic = convolve(log_hic_obsexp, kernel)    
-    
+    seq_hic = convolve(log_hic_obsexp, kernel)
+
     return seq_hic
 
 
@@ -239,7 +238,7 @@ def upper_triangular_to_vector(matrix, dim=512, diag_offset=2):
     """
     upper_tri_indices = np.triu_indices(dim, k=diag_offset)
     upper_tri_vector = matrix[upper_tri_indices]
-    
+
     return upper_tri_vector
 
 
@@ -283,7 +282,7 @@ def generate_and_save_dataset(args_tuple):
     # Filter to current fold
     df_fold = df[df["fold"] == f"fold{fold}"].reset_index(drop=True)
     logging.info(f"[Fold {fold}] Processing {len(df_fold)} regions")
-    
+
     data_list = []
     file_count = 0
     os.makedirs(output_dir, exist_ok=True)
@@ -291,7 +290,7 @@ def generate_and_save_dataset(args_tuple):
     for i, row in enumerate(df_fold.itertuples(index=False)):
         chrom, start, end = row.chrom, row.start, row.end
         mseq_str = f"{chrom}:{start}-{end}"
-        
+
         if (i + 1) % 10 == 0:
             logging.info(f"[Fold {fold}] Progress: {i+1}/{len(df_fold)}")
 
@@ -299,25 +298,25 @@ def generate_and_save_dataset(args_tuple):
             # Process DNA sequence
             sequence = genome[chrom][start:end]
             ohe_sequence = one_hot_encode_sequence(sequence)
-            
+
             # Process Hi-C matrix
             matrix = process_hic_matrix(
                 genome_hic_cool,
                 mseq_str,
-                bin_size=2048,        
+                bin_size=2048,
                 gaps_df=gaps_df
             )
-            
+
             # Convert to upper triangular vector
             hic_vector = upper_triangular_to_vector(matrix)
 
             # Convert to PyTorch tensors
             ohe_tensor = torch.tensor(
-                ohe_sequence.squeeze(0), 
+                ohe_sequence.squeeze(0),
                 dtype=torch.float32
             )
             hic_tensor = torch.tensor(
-                hic_vector, 
+                hic_vector,
                 dtype=torch.float32
             ).unsqueeze(0)
 
@@ -349,7 +348,7 @@ def main():
         description="Preprocess Hi-C and DNA sequences for Akita training",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    
+
     # Required arguments
     parser.add_argument(
         "--cool_file",
@@ -408,9 +407,9 @@ def main():
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Setup logging
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -439,7 +438,7 @@ def main():
         names=["chrom", "start", "end", "fold"]
     )
     logging.info(f"Loaded {len(df)} regions")
-    
+
     # Load gaps file if provided
     gaps_df = None
     if args.gaps_file:
@@ -451,14 +450,14 @@ def main():
             names=['chr', 'start', 'end']
         )
         logging.info(f"Loaded {len(gaps_df)} gap regions")
-    
+
     # Prepare arguments for parallel processing
     fold_args = [
-        (fold, df, args.fasta_file, args.cool_file, args.output_dir, 
+        (fold, df, args.fasta_file, args.cool_file, args.output_dir,
          gaps_df, args.bin_size)
         for fold in range(args.start_fold, args.end_fold + 1)
     ]
-    
+
     # Run parallel processing
     logging.info(f"Starting parallel processing with {args.num_workers} workers...")
     with Pool(processes=args.num_workers) as pool:
@@ -471,4 +470,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

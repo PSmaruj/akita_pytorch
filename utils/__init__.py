@@ -4,22 +4,21 @@ Utility functions for Akita v2 analysis and visualization.
 This package contains shared utilities used across notebooks and scripts.
 """
 
+from .analysis_utils import (
+    compare_datasets,
+    find_all_models,
+    load_loss_file,
+    plot_all_models,
+    plot_dataset_comparison,
+    plot_single_model,
+    print_summary_statistics,
+)
 from .visualization_utils import (
+    plot_comparison,
     plot_contact_map,
+    plot_matrix_grid,
     set_diag,
     upper_triu_to_matrix,
-    plot_comparison,
-    plot_matrix_grid
-)
-
-from .analysis_utils import (
-    load_loss_file,
-    find_all_models,
-    plot_single_model,
-    plot_all_models,
-    print_summary_statistics,
-    compare_datasets,
-    plot_dataset_comparison
 )
 
 __all__ = [

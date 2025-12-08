@@ -40,32 +40,32 @@ class HiCDataset(Dataset):
         - Sequences must be 2D tensors with shape (4, sequence_length)
         - All data is loaded into memory, so ensure sufficient RAM for large datasets
     """
-    
+
     def __init__(self, data_files):
         self.data = []  # To store all sequences and HiC vectors
-        
+
         # Load and process the data files
         for file in data_files:
             print(f"Loading file: {file}")
             file_data = torch.load(file, weights_only=True)
-            
+
             for data in file_data:
                 ohe_sequence, hic_vector = data
 
                 # Process the OHE sequence
                 ohe_sequence = ohe_sequence.squeeze(0)  # Remove singleton dimension
-                
+
                 # Ensure the sequence has the correct shape
                 assert ohe_sequence.shape[0] == 4, \
                     f"Expected 4 channels, but got {ohe_sequence.shape[0]}"
                 assert len(ohe_sequence.shape) == 2, \
                     f"Expected 2D shape for sequence, but got {ohe_sequence.shape}"
-                
+
                 # Add processed pair to the data list
                 self.data.append((ohe_sequence, hic_vector))
-        
+
         print(f"Total sequences loaded: {len(self.data)}")
-        
+
     def __len__(self):
         """Return the total number of sequences in the dataset."""
         return len(self.data)

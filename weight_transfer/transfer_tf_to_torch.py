@@ -13,14 +13,14 @@ Usage:
 import argparse
 import os
 import sys
-import torch
+
 import h5py
+import torch
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from akita_model.model_v2_compatible import SeqNN
-
 
 # =============================================================================
 # Weight Assignment Utilities
@@ -41,20 +41,20 @@ def assign_conv_weights(h5_file, tf_layer_path, pytorch_conv_layer):
     """
     # Load TensorFlow weights
     tf_weights = h5_file[tf_layer_path]['kernel:0'][:]
-    
+
     # Convert to PyTorch tensor and permute dimensions
     pytorch_weights = torch.tensor(tf_weights, dtype=torch.float32)
     pytorch_weights = pytorch_weights.permute(2, 1, 0)  # TF to PyTorch format
-    
+
     # Verify shape match
     assert pytorch_weights.shape == pytorch_conv_layer.weight.data.shape, \
         f"Shape mismatch: {pytorch_weights.shape} vs {pytorch_conv_layer.weight.data.shape}"
-    
+
     # Assign weights
     pytorch_conv_layer.weight.data = pytorch_weights
     print(f"  ✓ Assigned: {tf_layer_path}")
 
-    
+
 def assign_batch_norm_weights(h5_file, tf_layer_path, pytorch_batch_norm_layer):
     """
     Assign batch normalization weights from TensorFlow to PyTorch.
@@ -88,7 +88,7 @@ def assign_batch_norm_weights(h5_file, tf_layer_path, pytorch_batch_norm_layer):
 
     print(f"  ✓ Assigned: {tf_layer_path}")
 
-    
+
 def assign_conv2d_weights(h5_file, tf_layer_path, pytorch_conv2d_layer):
     """
     Assign weights from a TensorFlow 2D convolutional layer to PyTorch.
@@ -104,20 +104,20 @@ def assign_conv2d_weights(h5_file, tf_layer_path, pytorch_conv2d_layer):
     """
     # Load TensorFlow weights
     tf_weights = h5_file[tf_layer_path]['kernel:0'][:]
-    
+
     # Convert to PyTorch tensor and permute dimensions
     pytorch_weights = torch.tensor(tf_weights, dtype=torch.float32)
     pytorch_weights = pytorch_weights.permute(3, 2, 0, 1)  # TF to PyTorch format
-    
+
     # Verify shape match
     assert pytorch_weights.shape == pytorch_conv2d_layer.weight.data.shape, \
         f"Shape mismatch: {pytorch_weights.shape} vs {pytorch_conv2d_layer.weight.data.shape}"
-    
+
     # Assign weights
     pytorch_conv2d_layer.weight.data = pytorch_weights
     print(f"  ✓ Assigned: {tf_layer_path}")
 
-    
+
 def assign_dense_weights(h5_file, tf_layer_path, pytorch_dense_layer):
     """
     Assign weights and biases from a TensorFlow Dense layer to PyTorch.
@@ -134,20 +134,20 @@ def assign_dense_weights(h5_file, tf_layer_path, pytorch_dense_layer):
     # Load TensorFlow weights and biases
     tf_kernel = h5_file[tf_layer_path]['kernel:0'][:]
     tf_bias = h5_file[tf_layer_path]['bias:0'][:]
-    
+
     # Convert to PyTorch tensors
     pytorch_weights = torch.tensor(tf_kernel, dtype=torch.float32)
     pytorch_bias = torch.tensor(tf_bias, dtype=torch.float32)
-    
+
     # Transpose weights to match PyTorch format
     pytorch_weights = pytorch_weights.t()
-    
+
     # Verify shape match
     assert pytorch_weights.shape == pytorch_dense_layer.weight.data.shape, \
         f"Shape mismatch: {pytorch_weights.shape} vs {pytorch_dense_layer.weight.data.shape}"
     assert pytorch_bias.shape == pytorch_dense_layer.bias.data.shape, \
         f"Shape mismatch: {pytorch_bias.shape} vs {pytorch_dense_layer.bias.data.shape}"
-    
+
     # Assign weights and biases
     pytorch_dense_layer.weight.data = pytorch_weights
     pytorch_dense_layer.bias.data = pytorch_bias
@@ -171,13 +171,13 @@ def transfer_weights(model, h5_file, target_idx, organism):
     print("="*70)
     print("Transferring Weights")
     print("="*70)
-    
+
     # -------------------------------------------------------------------------
     # TRUNK - 1D Sequence Processing
     # -------------------------------------------------------------------------
     print("\n[1/5] ConvBlock (initial convolution)")
     assign_conv_weights(h5_file, "model_weights/conv1d/conv1d", model.conv_block_1.conv)
-    assign_batch_norm_weights(h5_file, "model_weights/batch_normalization/batch_normalization", 
+    assign_batch_norm_weights(h5_file, "model_weights/batch_normalization/batch_normalization",
                              model.conv_block_1.norm)
 
     print("\n[2/5] ConvTower (10 layers)")
@@ -186,7 +186,7 @@ def transfer_weights(model, h5_file, target_idx, organism):
         (6, 21, 22), (7, 25, 26), (8, 29, 30), (9, 33, 34), (10, 37, 38)
     ]
     for tf_idx, conv_idx, bn_idx in conv_tower_mapping:
-        assign_conv_weights(h5_file, f"model_weights/conv1d_{tf_idx}/conv1d_{tf_idx}", 
+        assign_conv_weights(h5_file, f"model_weights/conv1d_{tf_idx}/conv1d_{tf_idx}",
                            model.conv_tower.conv_tower[conv_idx])
         assign_batch_norm_weights(h5_file, f"model_weights/batch_normalization_{tf_idx}/batch_normalization_{tf_idx}",
                                  model.conv_tower.conv_tower[bn_idx])
@@ -202,26 +202,26 @@ def transfer_weights(model, h5_file, target_idx, organism):
     ]
     for tf_start_idx, block in residual_1d_blocks:
         # First conv + batchnorm
-        assign_conv_weights(h5_file, f"model_weights/conv1d_{tf_start_idx}/conv1d_{tf_start_idx}", 
+        assign_conv_weights(h5_file, f"model_weights/conv1d_{tf_start_idx}/conv1d_{tf_start_idx}",
                            block.conv1)
         assign_batch_norm_weights(h5_file, f"model_weights/batch_normalization_{tf_start_idx}/batch_normalization_{tf_start_idx}",
                                  block.norm1)
         # Second conv + batchnorm
-        assign_conv_weights(h5_file, f"model_weights/conv1d_{tf_start_idx+1}/conv1d_{tf_start_idx+1}", 
+        assign_conv_weights(h5_file, f"model_weights/conv1d_{tf_start_idx+1}/conv1d_{tf_start_idx+1}",
                            block.conv2)
         assign_batch_norm_weights(h5_file, f"model_weights/batch_normalization_{tf_start_idx+1}/batch_normalization_{tf_start_idx+1}",
                                  block.norm2)
 
     print("\n[4/5] ConvBlockReduce (channel reduction)")
     assign_conv_weights(h5_file, "model_weights/conv1d_33/conv1d_33", model.conv_reduce.layers[1])
-    assign_batch_norm_weights(h5_file, "model_weights/batch_normalization_33/batch_normalization_33", 
+    assign_batch_norm_weights(h5_file, "model_weights/batch_normalization_33/batch_normalization_33",
                              model.conv_reduce.layers[2])
 
     # -------------------------------------------------------------------------
     # HEAD - 2D Contact Matrix Prediction
     # -------------------------------------------------------------------------
     print("\n[5/5] 2D Convolutional Layers")
-    
+
     print("  Initial Conv2D block:")
     assign_conv2d_weights(h5_file, "model_weights/conv2d/conv2d", model.conv2d_block.block[1])
     assign_batch_norm_weights(h5_file, "model_weights/batch_normalization_34/batch_normalization_34",
@@ -235,12 +235,12 @@ def transfer_weights(model, h5_file, target_idx, organism):
     ]
     for conv_idx, bn_start_idx, block in residual_2d_blocks:
         # First conv + batchnorm
-        assign_conv2d_weights(h5_file, f"model_weights/conv2d_{conv_idx}/conv2d_{conv_idx}", 
+        assign_conv2d_weights(h5_file, f"model_weights/conv2d_{conv_idx}/conv2d_{conv_idx}",
                              block.conv1)
         assign_batch_norm_weights(h5_file, f"model_weights/batch_normalization_{bn_start_idx}/batch_normalization_{bn_start_idx}",
                                  block.norm1)
         # Second conv + batchnorm
-        assign_conv2d_weights(h5_file, f"model_weights/conv2d_{conv_idx+1}/conv2d_{conv_idx+1}", 
+        assign_conv2d_weights(h5_file, f"model_weights/conv2d_{conv_idx+1}/conv2d_{conv_idx+1}",
                              block.conv2)
         assign_batch_norm_weights(h5_file, f"model_weights/batch_normalization_{bn_start_idx+1}/batch_normalization_{bn_start_idx+1}",
                                  block.norm2)
@@ -248,9 +248,9 @@ def transfer_weights(model, h5_file, target_idx, organism):
     print("  Squeeze-and-Excite:")
     assign_batch_norm_weights(h5_file, "model_weights/squeeze_excite/squeeze_excite/batch_normalization",
                              model.squeeze_excite.norm)
-    assign_dense_weights(h5_file, "model_weights/squeeze_excite/squeeze_excite/dense", 
+    assign_dense_weights(h5_file, "model_weights/squeeze_excite/squeeze_excite/dense",
                         model.squeeze_excite.dense1)
-    assign_dense_weights(h5_file, "model_weights/squeeze_excite/squeeze_excite/dense_1", 
+    assign_dense_weights(h5_file, "model_weights/squeeze_excite/squeeze_excite/dense_1",
                         model.squeeze_excite.dense2)
 
     # -------------------------------------------------------------------------
@@ -268,7 +268,7 @@ def transfer_weights(model, h5_file, target_idx, organism):
         dense_layer_path = "model_weights/dense/dense"
     else:
         raise ValueError(f"Unknown organism: {organism}")
-    
+
     print(f"  Using TensorFlow layer: {dense_layer_path}")
 
     # Verify the layer exists
@@ -329,12 +329,12 @@ def main():
         default="/scratch1/smaruj/Akita_pytorch_models/tf_transferred",
         help="Output directory for PyTorch models"
     )
-    
+
     args = parser.parse_args()
 
     # Setup
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    
+
     print("="*70)
     print("TensorFlow to PyTorch Weight Transfer")
     print("="*70)
@@ -349,7 +349,7 @@ def main():
     # Determine model index based on organism
     organism = args.organism.lower()
     model_idx = 0 if organism == "human" else 1
-    
+
     # Construct paths
     tf_model_path = f"{args.tf_model_dir}/f{args.data_split}c0/train/model{model_idx}_best.h5"
     output_dir = f"{args.output_dir}/{organism}_models/{args.data_name}"
@@ -360,7 +360,7 @@ def main():
     if not os.path.exists(tf_model_path):
         raise FileNotFoundError(f"TensorFlow model not found: {tf_model_path}")
 
-    print(f"Loading TensorFlow weights from:")
+    print("Loading TensorFlow weights from:")
     print(f"  {tf_model_path}")
     print()
 

@@ -1,0 +1,12 @@
+# Byte-compiled files
+__pycache__/
+akita_model/__pycache__/
+data_preprocessing/__pycache__/
+training/__pycache__/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+*.egg-info/
+.pytest_cache/
+*.log

@@ -8,11 +8,11 @@ This package contains utilities for training Akita models, including:
 """
 
 from .training_utils import (
-    data_loader_for_precise_bn,
+    compute_initial_losses,
     compute_loss,
+    data_loader_for_precise_bn,
     train_epoch,
     validate,
-    compute_initial_losses
 )
 
 __all__ = [

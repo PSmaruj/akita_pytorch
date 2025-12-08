@@ -9,7 +9,6 @@ import torch
 import torch.nn.functional as F
 from fvcore.nn.precise_bn import update_bn_stats
 
-
 # =============================================================================
 # Utility Functions
 # =============================================================================
@@ -69,7 +68,7 @@ def train_epoch(model, device, train_loader, optimizer, epoch, args):
     """
     model.train()
     optimizer.train()
-    
+
     total_loss = 0.0
     num_batches = 0
     total_nans = 0
@@ -82,11 +81,11 @@ def train_epoch(model, device, train_loader, optimizer, epoch, args):
         # Forward pass and compute loss
         output = model(data)
         loss = compute_loss(output, target)
-        
+
         # Track NaN statistics
         total_nans += torch.isnan(target).sum().item()
         total_vals += target.numel()
-        
+
         # Backward pass
         loss.backward()
         optimizer.step()
@@ -95,7 +94,7 @@ def train_epoch(model, device, train_loader, optimizer, epoch, args):
         if args.weight_clipping > 0:
             for param in model.parameters():
                 param.data.clamp_(-args.weight_clipping, args.weight_clipping)
-        
+
         total_loss += loss.item()
         num_batches += 1
 
@@ -103,7 +102,7 @@ def train_epoch(model, device, train_loader, optimizer, epoch, args):
         if batch_idx % args.log_interval == 0:
             print(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} '
                   f'({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-            
+
             if args.dry_run:
                 break
 
@@ -112,15 +111,15 @@ def train_epoch(model, device, train_loader, optimizer, epoch, args):
     print(f'Training NaN fraction: {nan_frac:.2%} ({total_nans}/{total_vals})')
 
     avg_loss = total_loss / max(num_batches, 1)
-    
+
     # Update BatchNorm statistics with precise estimation
     print('Updating BatchNorm statistics with preciseBN...')
     update_bn_stats(
-        model, 
-        data_loader_for_precise_bn(train_loader, device), 
+        model,
+        data_loader_for_precise_bn(train_loader, device),
         num_iters=min(len(train_loader), 200)
     )
-    
+
     return avg_loss
 
 
@@ -146,11 +145,11 @@ def validate(model, device, val_loader):
         for data, target in val_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            
+
             # Track NaN statistics
             total_nans += torch.isnan(target).sum().item()
             total_vals += target.numel()
-            
+
             loss = compute_loss(output, target)
             if loss.item() > 0:  # Only count batches with valid data
                 total_loss += loss.item()
@@ -162,7 +161,7 @@ def validate(model, device, val_loader):
 
     avg_loss = total_loss / max(num_batches, 1)
     print(f'Validation set: Average MSE loss: {avg_loss:.4f}\n')
-    
+
     return avg_loss
 
 
@@ -180,7 +179,7 @@ def compute_initial_losses(model, device, train_loader, val_loader):
         tuple: (train_loss, val_loss)
     """
     model.eval()
-    
+
     with torch.no_grad():
         # Initial training loss
         init_train_loss = 0.0
@@ -193,7 +192,7 @@ def compute_initial_losses(model, device, train_loader, val_loader):
                 init_train_loss += loss.item()
                 num_train_batches += 1
         init_train_loss /= max(num_train_batches, 1)
-        
+
         # Initial validation loss
         init_val_loss = 0.0
         num_val_batches = 0
@@ -205,5 +204,5 @@ def compute_initial_losses(model, device, train_loader, val_loader):
                 init_val_loss += loss.item()
                 num_val_batches += 1
         init_val_loss /= max(num_val_batches, 1)
-    
+
     return init_train_loss, init_val_loss

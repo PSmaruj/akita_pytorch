@@ -14,32 +14,28 @@ import argparse
 import csv
 import os
 import sys
+
+import schedulefree
 import torch
 from torch.utils.data import DataLoader
-import schedulefree
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from akita_model.model import SeqNN
 from data_preprocessing.dataset import HiCDataset
-from training.training_utils import (
-    train_epoch,
-    validate,
-    compute_initial_losses
-)
-
+from training.training_utils import compute_initial_losses, train_epoch, validate
 
 # =============================================================================
 # Main Training Loop
 # =============================================================================
-    
+
 def main():
     parser = argparse.ArgumentParser(
         description='Train Akita v2 model from scratch',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    
+
     # Data arguments
     parser.add_argument(
         '--data_dir',
@@ -59,7 +55,7 @@ def main():
         required=True,
         help='Fold to use as validation data (e.g., "fold1")'
     )
-    
+
     # Training hyperparameters
     parser.add_argument(
         '--batch-size',
@@ -156,7 +152,7 @@ def main():
         default=1,
         help='Random seed'
     )
-    
+
     args = parser.parse_args()
 
 
@@ -181,32 +177,32 @@ def main():
     print(f'Early stopping patience: {args.early_stop_patience}')
     print('=' * 70)
     print()
-    
+
     # ==========================================================================
     # Load Data
     # ==========================================================================
-    
+
     print('Loading data...')
     all_files = [
-        os.path.join(args.data_dir, f) 
-        for f in os.listdir(args.data_dir) 
+        os.path.join(args.data_dir, f)
+        for f in os.listdir(args.data_dir)
         if f.endswith('.pt')
     ]
-    
+
     test_files = [f for f in all_files if args.test_fold in f]
     val_files = [f for f in all_files if args.val_fold in f]
     train_files = [
-        f for f in all_files 
+        f for f in all_files
         if args.test_fold not in f and args.val_fold not in f
     ]
-    
+
     print(f'Training files: {len(train_files)}')
     print(f'Validation files: {len(val_files)}')
     print(f'Test files: {len(test_files)}')
-    
+
     train_dataset = HiCDataset(train_files)
     val_dataset = HiCDataset(val_files)
-    
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
@@ -222,27 +218,27 @@ def main():
         num_workers=4,
         pin_memory=True
     )
-    
+
     print(f'Train batches: {len(train_loader)}')
     print(f'Validation batches: {len(val_loader)}')
     print()
-    
+
     # ==========================================================================
     # Initialize Model
     # ==========================================================================
-    
+
     print('Initializing model from scratch...')
     model = SeqNN()
     model.to(device)
     print('✓ Model initialized')
     print()
-    
+
     # ==========================================================================
     # Setup Optimizer
     # ==========================================================================
-    
+
     print(f'Setting up {args.optimizer} optimizer...')
-    
+
     if args.optimizer == 'adam':
         optimizer = schedulefree.AdamWScheduleFree(
             model.parameters(),
@@ -256,56 +252,56 @@ def main():
             momentum=args.momentum,
             weight_decay=args.l2_scale
         )
-    
+
     print('✓ Optimizer configured')
     print()
-    
+
     # ==========================================================================
     # Setup Output Paths
     # ==========================================================================
-    
+
     # Create directories for output files
     os.makedirs(os.path.dirname(args.save_model_path), exist_ok=True)
     os.makedirs(os.path.dirname(args.save_losses), exist_ok=True)
-    
+
     print(f'Model checkpoint will be saved to: {args.save_model_path}')
     print(f'Loss history will be saved to: {args.save_losses}')
     print()
-    
+
     # ==========================================================================
     # Compute Initial Losses
     # ==========================================================================
-    
+
     print('Computing initial losses (before training)...')
     init_train_loss, init_val_loss = compute_initial_losses(
         model, device, train_loader, val_loader
     )
-    
+
     print(f'Initial Train Loss: {init_train_loss:.6f}')
     print(f'Initial Validation Loss: {init_val_loss:.6f}')
     print()
-    
+
     # ==========================================================================
     # Training Loop
     # ==========================================================================
-    
+
     print('=' * 70)
     print('Starting training...')
     print('=' * 70)
     print()
-    
+
     best_val_loss = float('inf')
     epochs_no_improve = 0
-    
+
     # Open CSV file for logging
     file_exists = os.path.isfile(args.save_losses)
     with open(args.save_losses, 'a', newline='') as f:
         writer = csv.writer(f)
-        
+
         # Write header if new file
         if not file_exists:
             writer.writerow(['Epoch', 'Train Loss', 'Validation Loss'])
-        
+
         # Write initial losses (epoch 0)
         writer.writerow([0, init_train_loss, init_val_loss])
         f.flush()
@@ -316,14 +312,14 @@ def main():
             train_loss = train_epoch(
                 model, device, train_loader, optimizer, epoch, args
             )
-            
+
             # Validate
             val_loss = validate(model, device, val_loader)
-            
+
             # Log losses
             writer.writerow([epoch, train_loss, val_loss])
             f.flush()
-            
+
             # Check for improvement
             if val_loss < best_val_loss:
                 improvement = best_val_loss - val_loss
@@ -331,7 +327,7 @@ def main():
                       f'(Δ {improvement:.6f})')
                 best_val_loss = val_loss
                 epochs_no_improve = 0
-                
+
                 # Save best model
                 if args.save_model:
                     torch.save(model.state_dict(), args.save_model_path)
@@ -339,7 +335,7 @@ def main():
             else:
                 epochs_no_improve += 1
                 print(f'No improvement for {epochs_no_improve} epoch(s)')
-            
+
             print()
 
             # Early stopping
@@ -349,7 +345,7 @@ def main():
                 print(f'Best validation loss: {best_val_loss:.6f}')
                 print('=' * 70)
                 break
-    
+
     print()
     print('=' * 70)
     print('Training complete!')
@@ -363,4 +359,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    

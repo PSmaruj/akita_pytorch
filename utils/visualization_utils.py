@@ -5,13 +5,13 @@ This module contains shared visualization functions used across notebooks
 for plotting Hi-C contact matrices and other visualizations.
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 import torch
 
 
-def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r", 
+def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r",
                      width=5, height=5, title=None, show_colorbar=True):
     """
     Plot a Hi-C contact matrix as a heatmap.
@@ -30,9 +30,9 @@ def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r",
         tuple: (fig, ax) matplotlib figure and axis objects
     """
     fig, ax = plt.subplots(1, 1, figsize=(width, height))
-    
+
     cbar_kws = {'label': 'Log(Obs/Exp)'} if show_colorbar else None
-    
+
     sns.heatmap(
         matrix,
         vmin=vmin,
@@ -45,12 +45,12 @@ def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r",
         ax=ax,
         cbar_kws=cbar_kws
     )
-    
+
     if title:
         ax.set_title(title, fontsize=12, pad=10)
-    
+
     plt.tight_layout()
-    
+
     return fig, ax
 
 
@@ -105,23 +105,23 @@ def upper_triu_to_matrix(vector_repr, matrix_len=512, num_diags=2):
     # Convert to numpy if needed
     if isinstance(vector_repr, torch.Tensor):
         vector_repr = vector_repr.detach().flatten().cpu().numpy()
-    
+
     # Initialize zero matrix
     matrix = np.zeros((matrix_len, matrix_len))
-    
+
     # Get upper triangular indices (skipping diagonals)
     triu_indices = np.triu_indices(matrix_len, num_diags)
-    
+
     # Fill upper triangle
     matrix[triu_indices] = vector_repr
-    
+
     # Set skipped diagonals to NaN
     for i in range(-num_diags + 1, num_diags):
         set_diag(matrix, np.nan, i)
-    
+
     # Make symmetric
     symmetric_matrix = matrix + matrix.T
-    
+
     return symmetric_matrix
 
 
@@ -140,7 +140,7 @@ def plot_comparison(target_matrix, pred_matrix, sample_idx=0, vmin=-0.6, vmax=0.
         tuple: (fig, axes) matplotlib figure and axes objects
     """
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    
+
     # Ground truth
     sns.heatmap(
         target_matrix,
@@ -155,7 +155,7 @@ def plot_comparison(target_matrix, pred_matrix, sample_idx=0, vmin=-0.6, vmax=0.
         cbar_kws={'label': 'Log(Obs/Exp)'}
     )
     axes[0].set_title(f'Ground Truth (Sample {sample_idx})', fontsize=12, fontweight='bold')
-    
+
     # Prediction
     sns.heatmap(
         pred_matrix,
@@ -170,13 +170,13 @@ def plot_comparison(target_matrix, pred_matrix, sample_idx=0, vmin=-0.6, vmax=0.
         cbar_kws={'label': 'Log(Obs/Exp)'}
     )
     axes[1].set_title(f'Prediction (Sample {sample_idx})', fontsize=12, fontweight='bold')
-    
+
     plt.tight_layout()
-    
+
     return fig, axes
 
 
-def plot_matrix_grid(matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6, 
+def plot_matrix_grid(matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6,
                      suptitle=None, figsize_per_plot=4):
     """
     Plot multiple contact matrices in a grid.
@@ -195,20 +195,20 @@ def plot_matrix_grid(matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6,
     """
     n_samples = len(matrices)
     n_rows = int(np.ceil(n_samples / n_cols))
-    
+
     fig, axes = plt.subplots(
-        n_rows, n_cols, 
+        n_rows, n_cols,
         figsize=(figsize_per_plot * n_cols, figsize_per_plot * n_rows)
     )
-    
+
     # Handle single subplot case
     if n_samples == 1:
         axes = np.array([axes])
     axes = axes.flatten()
-    
+
     for idx, matrix in enumerate(matrices):
         ax = axes[idx]
-        
+
         sns.heatmap(
             matrix,
             vmin=vmin,
@@ -220,19 +220,19 @@ def plot_matrix_grid(matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6,
             yticklabels=False,
             ax=ax
         )
-        
+
         if titles and idx < len(titles):
             ax.set_title(titles[idx], fontsize=10)
         else:
             ax.set_title(f'Sample {idx}', fontsize=10)
-    
+
     # Hide unused subplots
     for idx in range(n_samples, len(axes)):
         axes[idx].axis('off')
-    
+
     if suptitle:
         plt.suptitle(suptitle, fontsize=14, fontweight='bold', y=1.00)
-    
+
     plt.tight_layout()
-    
+
     return fig, axes
