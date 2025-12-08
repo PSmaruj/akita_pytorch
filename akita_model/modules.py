@@ -14,13 +14,13 @@ genome folding prediction, including:
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as f
 
 
 class StochasticReverseComplement(nn.Module):
     """
     Stochastically reverse complement a one-hot encoded DNA sequence.
-    
+
     During training, randomly applies reverse complement transformation to DNA
     sequences (A<->T, C<->G, flipped left-to-right). During evaluation, sequences
     are returned unchanged.
@@ -122,11 +122,11 @@ class StochasticShift(nn.Module):
         """
         if shift > 0:
             # Shift right: pad left, remove right
-            seq_1hot_padded = F.pad(seq_1hot, (0, shift, 0, 0), mode=self.pad)
+            seq_1hot_padded = f.pad(seq_1hot, (0, shift, 0, 0), mode=self.pad)
             shifted_seq_1hot = seq_1hot_padded[:, shift:]
         elif shift < 0:
             # Shift left: pad right, remove left
-            seq_1hot_padded = F.pad(seq_1hot, (-shift, 0, 0, 0), mode=self.pad)
+            seq_1hot_padded = f.pad(seq_1hot, (-shift, 0, 0, 0), mode=self.pad)
             shifted_seq_1hot = seq_1hot_padded[:, :shift]
         else:
             # No shift if shift == 0
@@ -690,7 +690,7 @@ class SqueezeExcite(nn.Module):
 
         # Excite: MLP
         excite = self.dense1(squeeze)
-        excite = F.relu(excite)
+        excite = f.relu(excite)
         excite = self.dense2(excite)
 
         if self.norm is not None:
@@ -710,11 +710,11 @@ class SqueezeExcite(nn.Module):
     def _activate(self, x):
         """Apply specified activation function."""
         if self.activation == 'relu':
-            return F.relu(x)
+            return f.relu(x)
         elif self.activation == 'gelu':
-            return F.gelu(x)
+            return f.gelu(x)
         elif self.activation == 'silu':
-            return F.silu(x)
+            return f.silu(x)
         else:
             raise ValueError(f"Unsupported activation: {self.activation}")
 
@@ -850,9 +850,9 @@ class Final(nn.Module):
 
         # Apply activation function
         if self.activation == 'relu':
-            x = F.relu(x)
+            x = f.relu(x)
         elif self.activation == 'gelu':
-            x = F.gelu(x)
+            x = f.gelu(x)
         elif self.activation == 'linear':
             pass  # No activation
         else:
@@ -864,18 +864,18 @@ class Final(nn.Module):
 class SwitchReverseTriu(nn.Module):
     """
     Reverse upper triangular elements based on reverse complement flags.
-    
+
     This module is used when the model needs to handle reverse complemented
     sequences after extracting the upper triangular portion.
-    
+
     Args:
         diagonal_offset (int): Diagonal offset used in upper triangle extraction
         matrix_size (int): Size of the original square matrix (e.g., 448)
-    
+
     Input shape:
         - x: (batch_size, channels, ut_len) where ut_len is upper triangle length
         - reverse_bool: (batch_size,) boolean tensor
-    
+
     Output shape:
         (batch_size, channels, ut_len)
     """

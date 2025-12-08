@@ -28,22 +28,22 @@ from akita_model.modules import (
 class SeqNN(nn.Module):
     """
     Akita v2 sequence-to-contact neural network.
-    
+
     This model predicts Hi-C contact matrices from DNA sequences using a
     two-stage architecture:
     1. Trunk: 1D convolutions on the sequence to extract features
     2. Head: 2D convolutions on pairwise features to predict contacts
-    
+
     Args:
         n_channel (int): Number of input channels (4 for one-hot DNA). Default: 4
         n_targets (int): Number of output targets/tracks. Default: 1
-    
+
     Input shape:
         (batch_size, 4, 524288) - One-hot encoded DNA sequences
-    
+
     Output shape:
         (batch_size, n_targets, num_upper_triangular_elements)
-    
+
     Architecture overview:
         - Data augmentation: Stochastic reverse complement & shift
         - Initial conv block + conv tower (10 layers)
@@ -58,7 +58,7 @@ class SeqNN(nn.Module):
     """
 
     def __init__(self, n_channel=4, n_targets=5):
-        super(SeqNN, self).__init__()
+        super().__init__()
 
         # ====================================================================
         # TRUNK - 1D sequence processing
@@ -221,10 +221,10 @@ class SeqNN(nn.Module):
     def forward(self, x):
         """
         Forward pass through the model.
-        
+
         Args:
             x (Tensor): Input DNA sequences (batch_size, 4, sequence_length)
-        
+
         Returns:
             Tensor: Predicted Hi-C contacts (batch_size, n_targets, num_contacts)
         """
