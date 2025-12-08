@@ -84,7 +84,7 @@ def find_all_models(organism, dataset_name, base_path, training_type='finetuned'
             basename = os.path.basename(f)
             idx_str = basename.split("model")[1].split(f"_{training_type}")[0]
             model_indices.append(int(idx_str))
-        except:
+        except (IndexError, ValueError):
             continue
 
     return sorted(model_indices)

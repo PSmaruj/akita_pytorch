@@ -6,7 +6,7 @@ and fine-tuning scripts.
 """
 
 import torch
-import torch.nn.functional as F
+import torch.nn.functional as f
 from fvcore.nn.precise_bn import update_bn_stats
 
 # =============================================================================
@@ -43,7 +43,7 @@ def compute_loss(output, target):
     if not valid_mask.any():
         # All targets are NaN - return zero loss
         return torch.tensor(0.0, device=output.device)
-    return F.mse_loss(output[valid_mask], target[valid_mask])
+    return f.mse_loss(output[valid_mask], target[valid_mask])
 
 
 # =============================================================================

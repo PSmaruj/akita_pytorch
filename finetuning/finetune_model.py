@@ -375,16 +375,6 @@ def main():
                 print('=' * 70)
                 break
 
-
-
-            train_loss, val_loss, best_val_loss, epochs_no_improve = train(
-                args, model, device, train_loader, valid_loader,
-                optimizer, epoch, best_val_loss, epochs_no_improve,
-                weight_clip_value=args.weight_clipping,
-                save_model=args.save_model, save_model_path=save_model_path,
-                scaler=None
-            )
-
     print()
     print('=' * 70)
     print('Training complete!')
