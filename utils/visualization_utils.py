@@ -15,7 +15,7 @@ def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r",
                      width=5, height=5, title=None, show_colorbar=True):
     """
     Plot a Hi-C contact matrix as a heatmap.
-    
+
     Args:
         matrix (np.ndarray): Contact matrix to plot
         vmin (float): Minimum value for color scale. Default: -0.6
@@ -25,7 +25,7 @@ def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r",
         height (float): Figure height in inches. Default: 5
         title (str): Optional title for the plot. Default: None
         show_colorbar (bool): Whether to show colorbar. Default: True
-    
+
     Returns:
         tuple: (fig, ax) matplotlib figure and axis objects
     """
@@ -57,7 +57,7 @@ def plot_contact_map(matrix, vmin=-0.6, vmax=0.6, palette="RdBu_r",
 def set_diag(matrix, value, k):
     """
     Set a diagonal of a matrix to a specific value.
-    
+
     Args:
         matrix (np.ndarray): Input matrix (modified in-place)
         value: Value to set diagonal elements to
@@ -65,7 +65,7 @@ def set_diag(matrix, value, k):
             - k=0: main diagonal
             - k>0: diagonal above main diagonal
             - k<0: diagonal below main diagonal
-    
+
     Example:
         >>> matrix = np.ones((3, 3))
         >>> set_diag(matrix, 0, 0)  # Set main diagonal to 0
@@ -83,19 +83,19 @@ def set_diag(matrix, value, k):
 def upper_triu_to_matrix(vector_repr, matrix_len=512, num_diags=2):
     """
     Convert upper triangular vector representation back to full symmetric matrix.
-    
+
     Args:
         vector_repr (torch.Tensor or np.ndarray): Upper triangular vector
         matrix_len (int): Size of output square matrix. Default: 512
         num_diags (int): Number of diagonals that were skipped. Default: 2
-    
+
     Returns:
         np.ndarray: Symmetric contact matrix with near-diagonal set to NaN
-    
+
     Note:
         The first num_diags diagonals are set to NaN as they often contain
         artifacts from Hi-C data processing.
-    
+
     Example:
         >>> vector = torch.randn(130305)  # Upper triangle of 512x512 matrix
         >>> matrix = upper_triu_to_matrix(vector, matrix_len=512, num_diags=2)
@@ -128,14 +128,14 @@ def upper_triu_to_matrix(vector_repr, matrix_len=512, num_diags=2):
 def plot_comparison(target_matrix, pred_matrix, sample_idx=0, vmin=-0.6, vmax=0.6):
     """
     Plot ground truth and prediction side by side.
-    
+
     Args:
         target_matrix (np.ndarray): Ground truth contact matrix
         pred_matrix (np.ndarray): Predicted contact matrix
         sample_idx (int): Sample index for title. Default: 0
         vmin (float): Minimum value for color scale. Default: -0.6
         vmax (float): Maximum value for color scale. Default: 0.6
-    
+
     Returns:
         tuple: (fig, axes) matplotlib figure and axes objects
     """
@@ -180,7 +180,7 @@ def plot_matrix_grid(matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6,
                      suptitle=None, figsize_per_plot=4):
     """
     Plot multiple contact matrices in a grid.
-    
+
     Args:
         matrices (list): List of contact matrices to plot
         titles (list): Optional list of titles for each subplot. Default: None
@@ -189,7 +189,7 @@ def plot_matrix_grid(matrices, titles=None, n_cols=3, vmin=-0.6, vmax=0.6,
         vmax (float): Maximum value for color scale. Default: 0.6
         suptitle (str): Overall title for the figure. Default: None
         figsize_per_plot (float): Size of each subplot. Default: 4
-    
+
     Returns:
         tuple: (fig, axes) matplotlib figure and axes objects
     """

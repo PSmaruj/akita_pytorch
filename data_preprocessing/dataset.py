@@ -13,18 +13,18 @@ from torch.utils.data import Dataset
 class HiCDataset(Dataset):
     """
     PyTorch Dataset for Hi-C contact matrices paired with DNA sequences.
-    
+
     Loads preprocessed data files containing one-hot encoded (OHE) DNA sequences
     and their corresponding Hi-C contact matrix vectors. The data is loaded into
     memory for efficient access during training.
-    
+
     Args:
         data_files (list of str): List of file paths to preprocessed .pt data files.
             Each file should contain a list of (ohe_sequence, hic_vector) tuples.
-    
+
     Attributes:
         data (list): List of (ohe_sequence, hic_vector) tuples loaded from all files.
-    
+
     Examples:
         >>> train_files = ['train_data_0.pt', 'train_data_1.pt']
         >>> dataset = HiCDataset(data_files=train_files)
@@ -34,7 +34,7 @@ class HiCDataset(Dataset):
         >>> seq, hic = dataset[0]
         >>> print(seq.shape)  # Expected: (4, sequence_length)
         >>> print(hic.shape)  # Expected: (contact_matrix_length,)
-    
+
     Notes:
         - All sequences are expected to have 4 channels (A, C, G, T one-hot encoding)
         - Sequences must be 2D tensors with shape (4, sequence_length)
@@ -73,13 +73,13 @@ class HiCDataset(Dataset):
     def __getitem__(self, idx):
         """
         Get a single data sample.
-        
+
         Args:
             idx (int): Index of the sample to retrieve.
-        
+
         Returns:
             tuple: (ohe_sequence, hic_vector) where:
-                - ohe_sequence (torch.Tensor): One-hot encoded DNA sequence 
+                - ohe_sequence (torch.Tensor): One-hot encoded DNA sequence
                   with shape (4, sequence_length)
                 - hic_vector (torch.Tensor): Hi-C contact matrix vector
         """

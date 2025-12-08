@@ -16,11 +16,11 @@ from fvcore.nn.precise_bn import update_bn_stats
 def data_loader_for_precise_bn(loader, device):
     """
     Generator wrapper for precise BatchNorm statistics computation.
-    
+
     Args:
         loader (DataLoader): Training data loader
         device: PyTorch device
-    
+
     Yields:
         torch.Tensor: Input data batches
     """
@@ -31,11 +31,11 @@ def data_loader_for_precise_bn(loader, device):
 def compute_loss(output, target):
     """
     Compute MSE loss, ignoring NaN values in target.
-    
+
     Args:
         output (torch.Tensor): Model predictions
         target (torch.Tensor): Ground truth (may contain NaNs)
-    
+
     Returns:
         torch.Tensor: MSE loss computed only on valid (non-NaN) entries
     """
@@ -53,16 +53,16 @@ def compute_loss(output, target):
 def train_epoch(model, device, train_loader, optimizer, epoch, args):
     """
     Train for one epoch.
-    
+
     Args:
         model: PyTorch model
         device: PyTorch device
         train_loader: Training data loader
         optimizer: Optimizer (schedulefree.AdamWScheduleFree or SGDScheduleFree)
         epoch (int): Current epoch number
-        args: Command line arguments (must have log_interval, dry_run, 
+        args: Command line arguments (must have log_interval, dry_run,
               weight_clipping attributes)
-    
+
     Returns:
         float: Average training loss for the epoch
     """
@@ -126,12 +126,12 @@ def train_epoch(model, device, train_loader, optimizer, epoch, args):
 def validate(model, device, val_loader):
     """
     Validate model on validation set.
-    
+
     Args:
         model: PyTorch model
         device: PyTorch device
         val_loader: Validation data loader
-    
+
     Returns:
         float: Average validation loss
     """
@@ -168,13 +168,13 @@ def validate(model, device, val_loader):
 def compute_initial_losses(model, device, train_loader, val_loader):
     """
     Compute initial training and validation losses before training starts.
-    
+
     Args:
         model: PyTorch model
         device: PyTorch device
         train_loader: Training data loader
         val_loader: Validation data loader
-    
+
     Returns:
         tuple: (train_loss, val_loss)
     """

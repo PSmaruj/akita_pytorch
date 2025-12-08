@@ -16,7 +16,7 @@ import pandas as pd
 def load_loss_file(organism, dataset_name, model_idx, base_path, training_type='finetuned'):
     """
     Load loss CSV file for a specific model.
-    
+
     Args:
         organism (str): "mouse" or "human"
         dataset_name (str): Dataset name
@@ -24,10 +24,10 @@ def load_loss_file(organism, dataset_name, model_idx, base_path, training_type='
         base_path (str): Base path to models directory
         training_type (str): Type of training - 'finetuned' or 'trained_from_scratch'.
                            Default: 'finetuned'
-    
+
     Returns:
         pd.DataFrame or None: Loss dataframe or None if file not found
-    
+
     Example:
         >>> df = load_loss_file("mouse", "Hsieh2019_mESC", 0, "/path/to/models")
         >>> print(df.columns)
@@ -53,17 +53,17 @@ def load_loss_file(organism, dataset_name, model_idx, base_path, training_type='
 def find_all_models(organism, dataset_name, base_path, training_type='finetuned'):
     """
     Find all available model loss files for a dataset.
-    
+
     Args:
         organism (str): "mouse" or "human"
         dataset_name (str): Dataset name
         base_path (str): Base path to models directory
         training_type (str): Type of training - 'finetuned' or 'trained_from_scratch'.
                            Default: 'finetuned'
-    
+
     Returns:
         list: List of available model indices
-    
+
     Example:
         >>> indices = find_all_models("mouse", "Hsieh2019_mESC", "/path/to/models")
         >>> print(indices)
@@ -93,13 +93,13 @@ def find_all_models(organism, dataset_name, base_path, training_type='finetuned'
 def plot_single_model(df, model_idx, dataset_name, figsize=(10, 5)):
     """
     Plot loss curves for a single model.
-    
+
     Args:
         df (pd.DataFrame): Loss dataframe with columns ['Epoch', 'Train Loss', 'Validation Loss']
         model_idx (int): Model index
         dataset_name (str): Dataset name for title
         figsize (tuple): Figure size. Default: (10, 5)
-    
+
     Returns:
         tuple: (fig, ax, best_epoch, best_val_loss)
     """
@@ -133,7 +133,7 @@ def plot_all_models(organism, dataset_name, model_indices, base_path,
                     training_type='finetuned', figsize_per_plot=6):
     """
     Plot loss curves for all models in a grid of subplots.
-    
+
     Args:
         organism (str): "mouse" or "human"
         dataset_name (str): Dataset name
@@ -141,7 +141,7 @@ def plot_all_models(organism, dataset_name, model_indices, base_path,
         base_path (str): Base path to models directory
         training_type (str): Type of training. Default: 'finetuned'
         figsize_per_plot (float): Size of each subplot. Default: 6
-    
+
     Returns:
         tuple: (fig, axes, summary_stats) where summary_stats is a dict with
                'best_losses', 'best_epochs', 'best_model_idx'
@@ -229,7 +229,7 @@ def plot_all_models(organism, dataset_name, model_indices, base_path,
 def print_summary_statistics(dataset_name, model_indices, summary_stats):
     """
     Print summary statistics for model training results.
-    
+
     Args:
         dataset_name (str): Dataset name
         model_indices (list): List of model indices
@@ -258,13 +258,13 @@ def print_summary_statistics(dataset_name, model_indices, summary_stats):
 def compare_datasets(organism, dataset_names, base_path, training_type='finetuned'):
     """
     Compare best validation losses across multiple datasets.
-    
+
     Args:
         organism (str): "mouse" or "human"
         dataset_names (list): List of dataset names to compare
         base_path (str): Base path to models directory
         training_type (str): Type of training. Default: 'finetuned'
-    
+
     Returns:
         pd.DataFrame: Comparison dataframe with columns
                      ['Dataset', 'Model', 'Best Val Loss']
@@ -290,11 +290,11 @@ def compare_datasets(organism, dataset_names, base_path, training_type='finetune
 def plot_dataset_comparison(comparison_df, figsize=(12, 6)):
     """
     Plot comparison of best validation losses across datasets.
-    
+
     Args:
         comparison_df (pd.DataFrame): DataFrame from compare_datasets
         figsize (tuple): Figure size. Default: (12, 6)
-    
+
     Returns:
         tuple: (fig, ax)
     """

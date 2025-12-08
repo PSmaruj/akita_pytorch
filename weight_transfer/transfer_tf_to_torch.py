@@ -29,12 +29,12 @@ from akita_model.model_v2_compatible import SeqNN
 def assign_conv_weights(h5_file, tf_layer_path, pytorch_conv_layer):
     """
     Assign weights from a TensorFlow 1D convolutional layer to PyTorch.
-    
+
     Args:
         h5_file (h5py.File): HDF5 file containing TensorFlow weights
         tf_layer_path (str): Path to the TensorFlow layer in the HDF5 file
         pytorch_conv_layer (torch.nn.Conv1d): PyTorch convolutional layer
-    
+
     Note:
         TensorFlow Conv1D format: [width, in_channels, out_channels]
         PyTorch Conv1D format: [out_channels, in_channels, width]
@@ -58,13 +58,13 @@ def assign_conv_weights(h5_file, tf_layer_path, pytorch_conv_layer):
 def assign_batch_norm_weights(h5_file, tf_layer_path, pytorch_batch_norm_layer):
     """
     Assign batch normalization weights from TensorFlow to PyTorch.
-    
+
     Args:
         h5_file (h5py.File): HDF5 file containing TensorFlow weights
         tf_layer_path (str): Path to the TensorFlow BatchNorm layer
-        pytorch_batch_norm_layer (torch.nn.BatchNorm1d or torch.nn.BatchNorm2d): 
+        pytorch_batch_norm_layer (torch.nn.BatchNorm1d or torch.nn.BatchNorm2d):
             PyTorch batch normalization layer
-    
+
     Note:
         Maps TensorFlow parameters to PyTorch:
         - beta (TF) → bias (PyTorch)
@@ -92,12 +92,12 @@ def assign_batch_norm_weights(h5_file, tf_layer_path, pytorch_batch_norm_layer):
 def assign_conv2d_weights(h5_file, tf_layer_path, pytorch_conv2d_layer):
     """
     Assign weights from a TensorFlow 2D convolutional layer to PyTorch.
-    
+
     Args:
         h5_file (h5py.File): HDF5 file containing TensorFlow weights
         tf_layer_path (str): Path to the TensorFlow Conv2D layer
         pytorch_conv2d_layer (torch.nn.Conv2d): PyTorch Conv2D layer
-    
+
     Note:
         TensorFlow Conv2D format: [height, width, in_channels, out_channels]
         PyTorch Conv2D format: [out_channels, in_channels, height, width]
@@ -121,12 +121,12 @@ def assign_conv2d_weights(h5_file, tf_layer_path, pytorch_conv2d_layer):
 def assign_dense_weights(h5_file, tf_layer_path, pytorch_dense_layer):
     """
     Assign weights and biases from a TensorFlow Dense layer to PyTorch.
-    
+
     Args:
         h5_file (h5py.File): HDF5 file containing TensorFlow weights
         tf_layer_path (str): Path to the TensorFlow Dense layer
         pytorch_dense_layer (torch.nn.Linear): PyTorch linear (dense) layer
-    
+
     Note:
         TensorFlow Dense format: [in_features, out_features]
         PyTorch Linear format: [out_features, in_features]
@@ -161,7 +161,7 @@ def assign_dense_weights(h5_file, tf_layer_path, pytorch_dense_layer):
 def transfer_weights(model, h5_file, target_idx, organism):
     """
     Transfer all weights from TensorFlow model to PyTorch model.
-    
+
     Args:
         model (SeqNN): PyTorch model
         h5_file (h5py.File): HDF5 file with TensorFlow weights

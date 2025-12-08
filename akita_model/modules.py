@@ -24,13 +24,13 @@ class StochasticReverseComplement(nn.Module):
     During training, randomly applies reverse complement transformation to DNA
     sequences (A<->T, C<->G, flipped left-to-right). During evaluation, sequences
     are returned unchanged.
-    
+
     Args:
         None
-    
+
     Input shape:
         (batch_size, 4, sequence_length) - one-hot encoded DNA
-    
+
     Output shape:
         tuple: (transformed_sequence, reverse_bool)
             - transformed_sequence: (batch_size, 4, sequence_length)
@@ -39,7 +39,7 @@ class StochasticReverseComplement(nn.Module):
     """
 
     def __init__(self):
-        super(StochasticReverseComplement, self).__init__()
+        super().__init__()
 
     def forward(self, seq_1hot):
         device = seq_1hot.device  # Ensure tensors are on the same device
@@ -80,25 +80,25 @@ class StochasticReverseComplement(nn.Module):
 class StochasticShift(nn.Module):
     """
     Applies random horizontal shifts to DNA sequences during training.
-    
+
     Sequences are padded and shifted within a specified range. This data
     augmentation helps the model learn translation-invariant features.
-    
+
     Args:
         shift_max (int): Maximum shift distance in base pairs. Default: 0
         symmetric (bool): If True, allows shifts in both directions [-shift_max, shift_max].
                          If False, only positive shifts [0, shift_max]. Default: True
         pad (str): Padding mode for out-of-bounds regions. Options: 'constant',
                   'reflect', etc. Default: 'constant'
-    
+
     Input shape:
         (batch_size, 4, sequence_length)
-    
+
     Output shape:
         (batch_size, 4, sequence_length)
     """
     def __init__(self, shift_max=0, symmetric=True, pad='constant'):
-        super(StochasticShift, self).__init__()
+        super().__init__()
         self.shift_max = shift_max
         self.symmetric = symmetric
         self.pad = pad
@@ -112,11 +112,11 @@ class StochasticShift(nn.Module):
     def shift_sequence(self, seq_1hot, shift):
         """
         Apply a shift to a single sequence.
-        
+
         Args:
             seq_1hot (Tensor): Sequence to shift
             shift (int): Shift amount (positive = right, negative = left)
-        
+
         Returns:
             Tensor: Shifted sequence
         """
@@ -163,7 +163,7 @@ class StochasticShift(nn.Module):
 class ConvBlock(nn.Module):
     """
     Basic 1D convolutional block with normalization, pooling, and dropout.
-    
+
     Args:
         in_channels (int): Number of input channels
         filters (int): Number of output filters
@@ -182,7 +182,7 @@ class ConvBlock(nn.Module):
                  dilation_rate=1, pool_size=1, pool_type='max',
                  norm_type=None, bn_momentum=0.1, dropout_prob=0.4,
                  use_dropout=True):
-        super(ConvBlock, self).__init__()
+        super().__init__()
 
         # Convolution Layer
         self.conv = nn.Conv1d(
@@ -226,10 +226,10 @@ class ConvBlock(nn.Module):
 class ConvTower(nn.Module):
     """
     Stack of convolutional layers with increasing filter counts.
-    
+
     Each layer consists of: ReLU -> Conv1D -> Normalization -> MaxPool.
     Filter counts increase by filters_mult at each layer.
-    
+
     Args:
         in_channels (int): Number of input channels
         filters_init (int): Initial number of filters
@@ -243,7 +243,7 @@ class ConvTower(nn.Module):
 
     def __init__(self, in_channels, filters_init, filters_mult, kernel_size,
                  pool_size, repeat, norm_type='batch', bn_momentum=0.1):
-        super(ConvTower, self).__init__()
+        super().__init__()
 
         layers = []
         filters = filters_init
@@ -280,10 +280,10 @@ class ConvTower(nn.Module):
 class ResidualDilatedBlock1D(nn.Module):
     """
     1D residual block with dilated convolutions.
-    
-    Architecture: x -> ReLU -> Conv(dilation) -> Norm -> ReLU -> Conv(1x1) -> 
+
+    Architecture: x -> ReLU -> Conv(dilation) -> Norm -> ReLU -> Conv(1x1) ->
                   Norm -> Dropout -> Add residual
-    
+
     Args:
         in_channels (int): Number of input/output channels
         mid_channels (int): Number of intermediate channels (bottleneck)
@@ -295,7 +295,7 @@ class ResidualDilatedBlock1D(nn.Module):
 
     def __init__(self, in_channels, mid_channels, dropout_rate=0.4,
                  dilation_rate=1, bn_momentum=0.1, norm_type='batch'):
-        super(ResidualDilatedBlock1D, self).__init__()
+        super().__init__()
 
         self.relu1 = nn.ReLU()
         self.conv1 = nn.Conv1d(
@@ -352,9 +352,9 @@ class ResidualDilatedBlock1D(nn.Module):
 class ConvBlockReduce(nn.Module):
     """
     1D convolutional block for channel reduction.
-    
+
     Architecture: ReLU -> Conv1D -> Normalization -> ReLU
-    
+
     Args:
         in_channels (int): Number of input channels
         out_channels (int): Number of output channels
@@ -365,7 +365,7 @@ class ConvBlockReduce(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size=5,
                  bn_momentum=0.1, norm_type='batch'):
-        super(ConvBlockReduce, self).__init__()
+        super().__init__()
 
         layers = [
             nn.ReLU(),
@@ -396,10 +396,10 @@ class ConvBlockReduce(nn.Module):
 class OneToTwo(nn.Module):
     """
     Transform 1D sequence features into 2D pairwise features.
-    
+
     Creates a 2D feature map by combining each position with every other position.
     Different operations control how position pairs are combined.
-    
+
     Args:
         operation (str): How to combine position pairs. Options:
             - 'concat': Concatenate features from both positions
@@ -408,17 +408,17 @@ class OneToTwo(nn.Module):
             - 'multiply': Element-wise multiplication
             - 'multiply1': (x+1)*(y+1)-1 transformation
             Default: 'mean'
-    
+
     Input shape:
         (batch_size, features, seq_len)
-    
+
     Output shape:
         (batch_size, output_features, seq_len, seq_len)
         where output_features = 2*features for 'concat', else features
     """
 
     def __init__(self, operation='mean'):
-        super(OneToTwo, self).__init__()
+        super().__init__()
         self.operation = operation.lower()
         valid_operations = ['concat', 'mean', 'max', 'multiply', 'multiply1']
         assert self.operation in valid_operations, \
@@ -454,19 +454,19 @@ class OneToTwo(nn.Module):
 class ConcatDist2D(nn.Module):
     """
     Concatenate pairwise genomic distance to 2D feature matrix.
-    
+
     Adds a channel containing the distance between each pair of positions,
     which helps the model learn distance-dependent patterns in Hi-C data.
-    
+
     Input shape:
         (batch_size, features, seq_len, seq_len)
-    
+
     Output shape:
         (batch_size, features+1, seq_len, seq_len)
     """
 
     def __init__(self):
-        super(ConcatDist2D, self).__init__()
+        super().__init__()
 
     def forward(self, inputs):
         batch_size, features, seq_len, seq_len_ = inputs.shape
@@ -489,9 +489,9 @@ class ConcatDist2D(nn.Module):
 class Conv2DBlock(nn.Module):
     """
     Basic 2D convolutional block with normalization.
-    
+
     Architecture: ReLU -> Conv2D -> Normalization
-    
+
     Args:
         in_channels (int): Number of input channels
         out_channels (int): Number of output channels
@@ -502,7 +502,7 @@ class Conv2DBlock(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size=3,
                  bn_momentum=0.1, norm_type='batch'):
-        super(Conv2DBlock, self).__init__()
+        super().__init__()
 
         layers = [
             nn.ReLU(),
@@ -531,16 +531,16 @@ class Conv2DBlock(nn.Module):
 class Symmetrize2D(nn.Module):
     """
     Enforce matrix symmetry by averaging with transpose.
-    
+
     This is important for Hi-C contact matrices which represent symmetric
     pairwise interactions between genomic positions.
-    
+
     Input/Output shape:
         (batch_size, channels, height, width)
     """
 
     def __init__(self):
-        super(Symmetrize2D, self).__init__()
+        super().__init__()
 
     def forward(self, x):
         x_t = torch.transpose(x, 2, 3)  # Transpose spatial dimensions
@@ -551,10 +551,10 @@ class Symmetrize2D(nn.Module):
 class DilatedResidualBlock2D(nn.Module):
     """
     2D residual block with dilated convolutions and symmetry enforcement.
-    
-    Architecture: x -> ReLU -> Conv2D(dilation) -> Norm -> ReLU -> Conv2D(1x1) -> 
+
+    Architecture: x -> ReLU -> Conv2D(dilation) -> Norm -> ReLU -> Conv2D(1x1) ->
                   Norm -> Dropout -> Add residual -> Symmetrize
-    
+
     Args:
         in_channels (int): Number of input/output channels. Default: 48
         mid_channels (int): Number of intermediate channels (bottleneck). Default: 24
@@ -568,7 +568,7 @@ class DilatedResidualBlock2D(nn.Module):
     def __init__(self, in_channels=48, mid_channels=24, kernel_size=3,
                  dilation_rate=1, dropout_prob=0.1, bn_momentum=0.1,
                  norm_type='batch'):
-        super(DilatedResidualBlock2D, self).__init__()
+        super().__init__()
 
         self.relu = nn.ReLU()
 
@@ -635,10 +635,10 @@ class DilatedResidualBlock2D(nn.Module):
 class SqueezeExcite(nn.Module):
     """
     Squeeze-and-Excitation block for channel attention.
-    
+
     Adaptively recalibrates channel-wise features by explicitly modeling
     interdependencies between channels.
-    
+
     Args:
         in_channels (int): Number of input channels
         activation (str): Activation function ('relu', 'gelu', or 'silu'). Default: 'relu'
@@ -646,17 +646,17 @@ class SqueezeExcite(nn.Module):
         bottleneck_ratio (int): Reduction ratio for bottleneck. Default: 8
         norm_type (str): Normalization type ('batch' or None). Default: None
         bn_momentum (float): Batch normalization momentum. Default: 0.9
-    
+
     Input shape:
         (batch_size, channels, height, width)
-    
+
     Output shape:
         (batch_size, channels, height, width)
     """
 
     def __init__(self, in_channels, activation='relu', additive=False,
                  bottleneck_ratio=8, norm_type=None, bn_momentum=0.9):
-        super(SqueezeExcite, self).__init__()
+        super().__init__()
         self.activation = activation
         self.additive = additive
         self.norm_type = norm_type
@@ -723,19 +723,19 @@ class SqueezeExcite(nn.Module):
 class Cropping2D(nn.Module):
     """
     Crop 2D feature maps symmetrically from all sides.
-    
+
     Args:
         cropping (int): Number of pixels to crop from each side
-    
+
     Input shape:
         (batch_size, channels, height, width)
-    
+
     Output shape:
         (batch_size, channels, height-2*cropping, width-2*cropping)
     """
 
     def __init__(self, cropping):
-        super(Cropping2D, self).__init__()
+        super().__init__()
         self.cropping = cropping
 
     def forward(self, inputs):
@@ -752,24 +752,24 @@ class Cropping2D(nn.Module):
 class UpperTri(nn.Module):
     """
     Extract upper triangular portion of contact matrix and handle reverse complement.
-    
+
     For Hi-C matrices, we only need the upper triangle since they're symmetric.
     Also handles reversing the triangle when the input sequence was reverse complemented.
-    
+
     Args:
         diagonal_offset (int): Offset from main diagonal (2 = skip first 2 diagonals).
                               Default: 2
-    
+
     Input shape:
         - inputs: (batch_size, features, mat_size, mat_size)
         - reverse_complement_flags: (batch_size,) boolean tensor
-    
+
     Output shape:
         (batch_size, features, num_upper_tri_elements)
     """
 
     def __init__(self, diagonal_offset=2):
-        super(UpperTri, self).__init__()
+        super().__init__()
         self.diagonal_offset = diagonal_offset
 
     def forward(self, inputs, reverse_complement_flags):
@@ -815,26 +815,26 @@ class UpperTri(nn.Module):
 class Final(nn.Module):
     """
     Final output layer that transforms features to target predictions.
-    
+
     Maps from feature dimension to the desired number of output units (targets).
-    
+
     Args:
         activation (str): Output activation function. Options: 'relu', 'gelu', 'linear'.
                          Default: 'linear'
         units (int): Number of output units/targets. Default: 5
-    
+
     Input shape:
         (batch_size, 80, seq_length)
-    
+
     Output shape:
         (batch_size, units, seq_length)
-    
+
     Note:
         For L2 regularization, use weight_decay parameter in your optimizer.
     """
 
     def __init__(self, activation='linear', units=5, **kwargs):
-        super(Final, self).__init__()
+        super().__init__()
         self.activation = activation
         self.units = units
 
@@ -881,7 +881,7 @@ class SwitchReverseTriu(nn.Module):
     """
 
     def __init__(self, diagonal_offset, matrix_size):
-        super(SwitchReverseTriu, self).__init__()
+        super().__init__()
         self.diagonal_offset = diagonal_offset
         self.matrix_size = matrix_size
         self.ut_len = (matrix_size * (matrix_size + 1)) // 2
@@ -890,7 +890,7 @@ class SwitchReverseTriu(nn.Module):
         batch_size, channels, length = x.size()
 
         # Get upper triangular indices
-        ut_indices = torch.triu_indices(
+        torch.triu_indices(
             self.matrix_size,
             self.matrix_size,
             self.diagonal_offset

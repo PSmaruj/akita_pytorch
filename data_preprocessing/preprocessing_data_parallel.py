@@ -40,14 +40,14 @@ from pyfaidx import Fasta
 def one_hot_encode_sequence(sequence_obj):
     """
     One-hot encode a DNA sequence.
-    
+
     Args:
         sequence_obj: Sequence object from pyfaidx (or string)
-    
+
     Returns:
         np.ndarray: One-hot encoded sequence with shape (1, 4, length)
                    Channels are ordered as [A, C, G, T]
-    
+
     Note:
         Unknown bases (N, etc.) are randomly assigned to A, C, G, or T
     """
@@ -70,14 +70,14 @@ def one_hot_encode_sequence(sequence_obj):
 def extract_coordinates_from_mseq(mseq_str):
     """
     Parse genomic coordinates from string format.
-    
+
     Args:
         mseq_str (str): Genomic region in format "chr:start-end"
                        Example: "chr1:1000000-2000000"
-    
+
     Returns:
         tuple: (chrom, start, end)
-    
+
     Raises:
         ValueError: If format is invalid
     """
@@ -102,7 +102,7 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
                        padding=64, kernel_stddev=1, bin_size=2048, gaps_df=None):
     """
     Process a Hi-C contact matrix for a given genomic region.
-    
+
     Processing steps:
         1. Load balanced matrix from cooler file
         2. Mask NaN rows/columns (low coverage regions)
@@ -112,7 +112,7 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
         6. Calculate observed/expected and log transform
         7. Apply padding and interpolate remaining NaNs
         8. Gaussian smoothing
-    
+
     Args:
         genome_hic_cool (cooler.Cooler): Cooler object for Hi-C data
         mseq_str (str): Genomic region string "chr:start-end"
@@ -122,10 +122,10 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
         bin_size (int): Bin size in base pairs. Default: 2048
         gaps_df (pd.DataFrame): DataFrame with gap regions (chr, start, end).
                                Default: None
-    
+
     Returns:
         np.ndarray: Processed Hi-C matrix (after padding removal)
-    
+
     Note:
         Skips regions where >50% of bins are filtered (low quality data)
     """
@@ -223,15 +223,15 @@ def process_hic_matrix(genome_hic_cool, mseq_str, diagonal_offset=2,
 def upper_triangular_to_vector(matrix, dim=512, diag_offset=2):
     """
     Extract upper triangular portion of matrix, skipping near-diagonal.
-    
+
     Args:
         matrix (np.ndarray): Square contact matrix
         dim (int): Matrix dimension (should match matrix.shape[0]). Default: 512
         diag_offset (int): Number of diagonals to skip. Default: 2
-    
+
     Returns:
         np.ndarray: 1D vector of upper triangular elements
-    
+
     Note:
         The first diag_offset diagonals are excluded as they often contain
         artifacts from Hi-C data processing.
@@ -249,12 +249,12 @@ def upper_triangular_to_vector(matrix, dim=512, diag_offset=2):
 def generate_and_save_dataset(args_tuple):
     """
     Process and save one fold of the dataset.
-    
+
     This function runs in parallel worker processes. Each worker:
     1. Loads its own file handles (FASTA, cooler)
     2. Processes all regions in the assigned fold
     3. Saves results in batches of 100 samples
-    
+
     Args:
         args_tuple (tuple): Contains:
             - fold (int): Fold number
@@ -264,10 +264,10 @@ def generate_and_save_dataset(args_tuple):
             - output_dir (str): Directory for output files
             - gaps_df (pd.DataFrame): Gap regions dataframe
             - bin_size (int): Bin size for Hi-C processing
-    
+
     Returns:
         None (saves .pt files to disk)
-    
+
     Note:
         Saves every 100 samples to avoid memory issues with large datasets.
     """
