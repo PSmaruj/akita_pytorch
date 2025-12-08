@@ -22,7 +22,5 @@ jobs:
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2024.1
         with:
-          # Use Python-specific linter
-          args: --linter,jetbrains/qodana-python:latest
-        env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+          # Use Python Community version (no token required)
+          args: --linter,jetbrains/qodana-python-community:latest
