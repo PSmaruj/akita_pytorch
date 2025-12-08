@@ -1,0 +1,42 @@
+#-------------------------------------------------------------------------------#
+#               Qodana analysis is configured by qodana.yaml file               #
+#             https://www.jetbrains.com/help/qodana/qodana-yaml.html            #
+#-------------------------------------------------------------------------------#
+version: "1.0"
+
+# Specify the linter to use
+linter: jetbrains/qodana-python:latest
+
+# Exclude paths from analysis
+exclude:
+  - name: All
+    paths:
+      - .git
+      - .github
+      - .pytest_cache
+      - __pycache__
+      - models  # Large model files
+      - plots
+      - .ipynb_checkpoints
+      - htmlcov
+
+# Include specific paths
+include:
+  - name: All
+    paths:
+      - akita_model
+      - data_processing
+      - training
+      - finetuning
+      - evaluation
+      - weight_transfer
+      - utils
+      - tests
+
+# Configure Python-specific settings
+python:
+  version: "3.10"
+
+# Profile settings
+profile:
+  name: qodana.recommended  # or qodana.starter for fewer checks

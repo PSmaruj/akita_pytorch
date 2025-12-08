@@ -1,26 +1,28 @@
-name: Qodana
-
+name: Qodana Code Quality
 on:
-  push:
+  workflow_dispatch:
   pull_request:
+  push:
+    branches:
+      - main
+      - master
 
 jobs:
   qodana:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
 
-      - name: Qodana Scan
-        uses: JetBrains/qodana-action@v2024.2
+      - name: 'Qodana Scan'
+        uses: JetBrains/qodana-action@v2024.1
         with:
-          upload-result: true
-          artifact-name: qodana-report
-          use-annotations: true
-      
-      - name: Upload Qodana SARIF
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Use Python-specific linter
+          args: --linter,jetbrains/qodana-python:latest
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
