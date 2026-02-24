@@ -148,9 +148,8 @@ def process_hic_matrix(
     # Quality check: skip if too many bins filtered
     if num_filtered_bins > (0.5 * len(seq_hic_nan)):
         logging.warning(
-            f"Skipping {mseq_str}: >50% bins filtered ({num_filtered_bins}/{len(seq_hic_nan)})"
+            f"Seq {mseq_str}: >50% bins filtered ({num_filtered_bins}/{len(seq_hic_nan)})"
         )
-        raise ValueError("Too many filtered bins")
 
     # Create masks for NaN rows and columns
     row_nan_mask = np.all(seq_hic_nan, axis=1)
@@ -175,7 +174,6 @@ def process_hic_matrix(
                 gap_end_idx = (
                     min(
                         gap_end - start,
-                        seq_hic_raw.shape[0] * bin_size,
                         seq_hic_raw.shape[0] * bin_size,
                     )
                     // bin_size
@@ -216,6 +214,13 @@ def process_hic_matrix(
         row_nan_mask = row_nan_mask[padding:-padding]
         col_nan_mask = col_nan_mask[padding:-padding]
 
+    # Fill edge/corner NaNs that interp_nan can't handle (no valid neighbors)
+    if np.any(np.isnan(log_hic_obsexp)):
+        nan_fraction = np.isnan(log_hic_obsexp).mean()
+        if nan_fraction > 0.1:
+            logging.warning(f"High NaN fraction ({nan_fraction:.1%}) in {mseq_str}, filling with 0")
+        log_hic_obsexp = np.nan_to_num(log_hic_obsexp, nan=0.0)
+
     # Interpolate remaining NaNs
     log_hic_obsexp = interp_nan(log_hic_obsexp)
 
@@ -227,6 +232,9 @@ def process_hic_matrix(
     kernel = Gaussian2DKernel(x_stddev=kernel_stddev)
     seq_hic = convolve(log_hic_obsexp, kernel)
 
+    seq_hic[row_nan_mask, :] = np.nan
+    seq_hic[:, col_nan_mask] = np.nan
+    
     return seq_hic
 
 

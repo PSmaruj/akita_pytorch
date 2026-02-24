@@ -7,7 +7,7 @@ This script transfers pretrained weights from a TensorFlow Akita v2 model
 weight format conversions and layer mappings between the two frameworks.
 
 Usage:
-    python transfer_tf_to_torch.py --target_idx 0 --data_split 0 --organism mouse --data_name Krietenstein2019_H1hESC
+    python transfer_tf_to_torch.py --target_idx 0 --data_split 0 --organism human --data_name Krietenstein2019_H1hESC
 """
 
 import argparse
@@ -20,7 +20,7 @@ import torch
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from akita_model.model_v2_compatible import SeqNN
+from akita_model.model import SeqNN
 
 # =============================================================================
 # Weight Assignment Utilities
@@ -184,7 +184,7 @@ def transfer_weights(model, h5_file, target_idx, organism):
     print("\n[1/5] ConvBlock (initial convolution)")
     assign_conv_weights(h5_file, "model_weights/conv1d/conv1d", model.conv_block_1.conv)
     assign_batch_norm_weights(
-        h5_file, "model_weights/batch_normalization/batch_normalization", model.conv_block_1.norm
+        h5_file, "model_weights/batch_normalization/batch_normalization", model.conv_block_1.batch_norm
     )
 
     print("\n[2/5] ConvTower (10 layers)")
@@ -378,7 +378,7 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="/scratch1/smaruj/Akita_pytorch_models/tf_transferred",
+        default="/home1/smaruj/pytorch_akita/models/pretrained",
         help="Output directory for PyTorch models",
     )
 
@@ -404,7 +404,7 @@ def main():
 
     # Construct paths
     tf_model_path = f"{args.tf_model_dir}/f{args.data_split}c0/train/model{model_idx}_best.h5"
-    output_dir = f"{args.output_dir}/{organism}_models/{args.data_name}"
+    output_dir = f"{args.output_dir}/{organism}/{args.data_name}"
     os.makedirs(output_dir, exist_ok=True)
     output_file = f"{output_dir}/Akita_v2_{organism}_{args.data_name}_model{args.data_split}.pth"
 
@@ -435,7 +435,7 @@ def main():
     print("=" * 70)
     print("Saving Model")
     print("=" * 70)
-    torch.save(model, output_file)
+    torch.save(model.state_dict(), output_file)
     print(f"✓ Model saved to: {output_file}")
     print("=" * 70)
     print()

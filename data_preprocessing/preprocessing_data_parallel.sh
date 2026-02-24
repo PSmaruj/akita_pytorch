@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 #==============================================================================
@@ -48,13 +47,13 @@ conda activate pytorch_hic
 #------------------------------------------------------------------------------
 
 # Species selection: set to "mouse" or "human"
-SPECIES="mouse"
+SPECIES="human"
 
 # Hi-C data
-COOL_FILE="/project2/fudenber_735/GEO/bonev_2017_GSE96107/distiller-0.3.1_mm10/results/coolers/HiC_ncx_CN_all.mm10.mapq_30.2048.cool"
+COOL_FILE="/project2/fudenber_735/smaruj/sequence_design/ledidi_semifreddo_akita/Akita_pytorch_training_data/human_cool_files/Krietenstein2019_HFF/HiC_Krietenstein2019_HFF.hg38.mapq30.2048.cool"
 
 # Output directory for processed .pt files
-OUTPUT_DIR="/scratch1/smaruj/Akita_pytorch_training_data/mouse_data/Bonev2017_ncx_CN"
+OUTPUT_DIR="/project2/fudenber_735/smaruj/sequence_design/ledidi_semifreddo_akita/Akita_pytorch_training_data/human_training_data/Krietenstein2019_HFF"
 
 # Parallel processing settings
 NUM_WORKERS=64                         # Should match or be less than --cpus-per-task
