@@ -184,7 +184,9 @@ def transfer_weights(model, h5_file, target_idx, organism):
     print("\n[1/5] ConvBlock (initial convolution)")
     assign_conv_weights(h5_file, "model_weights/conv1d/conv1d", model.conv_block_1.conv)
     assign_batch_norm_weights(
-        h5_file, "model_weights/batch_normalization/batch_normalization", model.conv_block_1.batch_norm
+        h5_file,
+        "model_weights/batch_normalization/batch_normalization",
+        model.conv_block_1.batch_norm,
     )
 
     print("\n[2/5] ConvTower (10 layers)")

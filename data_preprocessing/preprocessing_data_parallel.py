@@ -234,7 +234,7 @@ def process_hic_matrix(
 
     seq_hic[row_nan_mask, :] = np.nan
     seq_hic[:, col_nan_mask] = np.nan
-    
+
     return seq_hic
 
 
