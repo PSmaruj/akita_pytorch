@@ -20,6 +20,11 @@ from .visualization_utils import (
     set_diag,
     upper_triu_to_matrix,
 )
+from .data_utils import (
+    one_hot_encode_sequence, 
+    process_hic_matrix, 
+    upper_triangular_to_vector
+)
 
 __all__ = [
     # Visualization
@@ -36,4 +41,8 @@ __all__ = [
     "print_summary_statistics",
     "compare_datasets",
     "plot_dataset_comparison",
+    # Data
+    "one_hot_encode_sequence", 
+    "process_hic_matrix", 
+    "upper_triangular_to_vector"
 ]

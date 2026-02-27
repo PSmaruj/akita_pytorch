@@ -17,7 +17,7 @@ The models in this repository were transferred from the original TensorFlow impl
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/pytorch_akita.git
+git clone https://github.com/PSmaruj/pytorch_akita.git
 cd pytorch_akita
 ```
 
@@ -38,7 +38,7 @@ conda activate pytorch_akita
 ```bash
 # Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate]
 
 # Install dependencies
 pip install -r requirements.txt
@@ -59,6 +59,11 @@ pytorch_akita/
 │   ├── model.py                # Main Akita v2 model (clean implementation)
 │   ├── model_v2_compatible.py  # Compatible with old checkpoints
 │   └── modules.py              # Neural network building blocks
+│
+├── benchmarking/               # Cross-model performance comparison
+│   ├── test_sets_construction/ # Scripts to find overlaps between Akita, AlphaGenome, & ORCA
+│   ├── test_sets/              # Human and Mouse test datasets (TSV format)
+│   └── evaluation/             # Scripts for running all models on the shared test sets
 │
 ├── data_processing/            # Data preprocessing utilities
 │   ├── dataset.py              # PyTorch Dataset for Hi-C data
@@ -104,10 +109,11 @@ pytorch_akita/
 
 ## Available Models
 
-Pretrained models are available in the `models/` directory:
+Pytorch-Akita models are available in the `models/` directory:
 
-- **`models/tf_transferred/`**: Models with weights transferred from TensorFlow
+- **`models/pretrained/`**: Models with weights transferred from TensorFlow
 - **`models/finetuned/`**: Fine-tuned models for specific cell types
+- **`models/trained_from_scratch/`**: Model trained from scratch on B-cell data
 
 ### Organisms and Cell Types
 
@@ -265,4 +271,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Last Updated**: December 2025
+**Last Updated**: February 2026
