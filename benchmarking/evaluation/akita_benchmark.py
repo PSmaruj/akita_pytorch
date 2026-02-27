@@ -15,13 +15,12 @@ Usage:
 import argparse
 import os
 import sys
-import random
 
+import cooler
 import numpy as np
+import pandas as pd
 import torch
 from pyfaidx import Fasta
-import cooler
-import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -35,6 +34,7 @@ MODELS_DIR = os.path.join(AKITA_REPO, "models/finetuned")
 sys.path.append(AKITA_REPO)
 from utils.data_utils import one_hot_encode_sequence, process_hic_matrix, upper_triangular_to_vector
 
+
 def run_benchmark(args: argparse.Namespace) -> None:
     # ── Import model class from the Akita repository ──────────────────────────
     sys.path.append(AKITA_REPO)
@@ -44,9 +44,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
     print(f"Using device: {device}")
 
     # ── Resolve paths from organism / dataset ─────────────────────────────────
-    overlap_table = os.path.join(
-        TEST_SETS_DIR, f"benchmark_test_set_{args.organism}.tsv"
-    )
+    overlap_table = os.path.join(TEST_SETS_DIR, f"benchmark_test_set_{args.organism}.tsv")
     model_dir = os.path.join(MODELS_DIR, args.organism, args.dataset, "checkpoints")
     model_prefix = f"Akita_v2_{args.organism}_{args.dataset}"
 
@@ -107,7 +105,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
             )
 
             target_vec = upper_triangular_to_vector(hic_mat, dim=512, diag_offset=2)
-            
+
             # Model prediction
             with torch.no_grad():
                 pred_vec = model(ohe_tensor).squeeze().cpu().numpy()
@@ -138,6 +136,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
 # CLI
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Benchmark an Akita model: report Pearson R, Spearman R, and MSE.",
@@ -153,7 +152,7 @@ def parse_args() -> argparse.Namespace:
         "--dataset",
         required=True,
         help="Dataset name, e.g. 'Hsieh2019_mESC'. Used to locate models and build "
-             "the model prefix (<organism>/<dataset>/checkpoints/).",
+        "the model prefix (<organism>/<dataset>/checkpoints/).",
     )
     parser.add_argument("--fasta", required=True, help="Genome FASTA file.")
     parser.add_argument("--cool", required=True, help="Hi-C .cool file.")

@@ -1,29 +1,26 @@
-import re
-import random
-import numpy as np
-import pandas as pd
-import cooler
 import logging
-from typing import Optional
+import random
+import re
+
+import numpy as np
 from astropy.convolution import Gaussian2DKernel, convolve
 from cooltools.lib.numutils import (
-    observed_over_expected,
     adaptive_coarsegrain,
-    set_diag,
     interp_nan,
+    observed_over_expected,
+    set_diag,
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Sequence utilities
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def one_hot_encode_sequence(sequence_obj: object) -> np.ndarray:
     """One-hot encode a DNA sequence, randomising ambiguous bases."""
     sequence = str(sequence_obj).upper()
     base_to_int = {"A": 0, "C": 1, "G": 2, "T": 3}
-    encoded = np.array(
-        [base_to_int.get(b, base_to_int[random.choice("ACGT")]) for b in sequence]
-    )
+    encoded = np.array([base_to_int.get(b, base_to_int[random.choice("ACGT")]) for b in sequence])
     ohe = np.zeros((4, len(encoded)), dtype=np.float32)
     ohe[encoded, np.arange(len(encoded))] = 1
     return np.expand_dims(ohe, axis=0)
@@ -32,6 +29,7 @@ def one_hot_encode_sequence(sequence_obj: object) -> np.ndarray:
 # ──────────────────────────────────────────────────────────────────────────────
 # Coordinate parsing
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def extract_coordinates_from_mseq(mseq_str):
     """
@@ -208,6 +206,7 @@ def process_hic_matrix(
 # ──────────────────────────────────────────────────────────────────────────────
 # Matrix / vector helpers
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def upper_triangular_to_vector(matrix, dim=512, diag_offset=2):
     """

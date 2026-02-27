@@ -13,17 +13,13 @@ from .analysis_utils import (
     plot_single_model,
     print_summary_statistics,
 )
+from .data_utils import one_hot_encode_sequence, process_hic_matrix, upper_triangular_to_vector
 from .visualization_utils import (
     plot_comparison,
     plot_contact_map,
     plot_matrix_grid,
     set_diag,
     upper_triu_to_matrix,
-)
-from .data_utils import (
-    one_hot_encode_sequence, 
-    process_hic_matrix, 
-    upper_triangular_to_vector
 )
 
 __all__ = [
@@ -42,7 +38,7 @@ __all__ = [
     "compare_datasets",
     "plot_dataset_comparison",
     # Data
-    "one_hot_encode_sequence", 
-    "process_hic_matrix", 
-    "upper_triangular_to_vector"
+    "one_hot_encode_sequence",
+    "process_hic_matrix",
+    "upper_triangular_to_vector",
 ]

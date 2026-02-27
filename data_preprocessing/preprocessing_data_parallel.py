@@ -19,7 +19,6 @@ import sys
 from multiprocessing import Pool, cpu_count
 
 import cooler
-import numpy as np
 import pandas as pd
 import torch
 from pyfaidx import Fasta
