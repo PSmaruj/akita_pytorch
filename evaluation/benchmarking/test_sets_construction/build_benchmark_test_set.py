@@ -53,7 +53,7 @@ AKITA_BED = {
     "mouse": "/project2/fudenber_735/tensorflow_models/akita/v2/data/mm10/sequences.bed",
 }
 
-DEFAULT_DATA_ROOT = Path("/home1/smaruj/pytorch_akita/benchmarking/test_sets")
+DEFAULT_DATA_ROOT = Path("/home1/smaruj/pytorch_akita/evaluation/benchmarking/test_sets")
 
 
 # ---------------------------------------------------------------------------

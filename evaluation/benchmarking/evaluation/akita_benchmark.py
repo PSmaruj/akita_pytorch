@@ -1,15 +1,14 @@
 """
-AlphaGenome Model Benchmarking Script
-Evaluates AlphaGenome model accuracy (Pearson R, Spearman R, MSE) on a given species/cell type.
+Akita Model Benchmarking Script
+Evaluates Akita model accuracy (Pearson R, Spearman R, MSE) on a given species/cell type.
 
 Usage:
-    python alphagenome_benchmark.py \
+    python akita_benchmark.py \
         --organism mouse \
-        --ontology_id EFO:0004038 \
-        --fasta /path/to/genome.fa \
-        --cool /path/to/hic.cool \
-        --n_models 4 \
-        --api_key YOUR_API_KEY \
+        --dataset Hsieh2019_mESC \
+        --fasta /project2/fudenber_735/genomes/mm10/mm10.fa \
+        --cool /project2/fudenber_735/GEO/Hsieh2019/4DN/mESC_mm10_4DNFILZ1CPT8.mapq_30.2048.cool \
+        --n_models 8 \
         --blacklist /path/to/blacklist.bed
 """
 
@@ -20,58 +19,42 @@ import sys
 import cooler
 import numpy as np
 import pandas as pd
-from alphagenome.models import dna_client
+import torch
 from pyfaidx import Fasta
 from scipy.stats import pearsonr, spearmanr
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Constants
-# ──────────────────────────────────────────────────────────────────────────────
-
-AKITA_REPO = "/home1/smaruj/pytorch_akita"
-TEST_SETS_DIR = os.path.join(AKITA_REPO, "benchmarking/test_sets")
-
-sys.path.append(AKITA_REPO)
-from utils.data_utils import process_hic_matrix, upper_triangular_to_vector
-
-CROP_BINS = 64  # bins to crop from each side (shared with Akita padding)
-BIN_SIZE = 2048  # Hi-C bin size in bp
-
-_ORGANISM_MAP = {
-    "mouse": dna_client.Organism.MUS_MUSCULUS,
-    "human": dna_client.Organism.HOMO_SAPIENS,
-}
-
-_FOLD_VERSION_MAP = {
-    0: dna_client.ModelVersion.FOLD_0,
-    1: dna_client.ModelVersion.FOLD_1,
-    2: dna_client.ModelVersion.FOLD_2,
-    3: dna_client.ModelVersion.FOLD_3,
-}
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Main benchmarking routine
 # ──────────────────────────────────────────────────────────────────────────────
 
+AKITA_REPO = "/home1/smaruj/pytorch_akita"
+TEST_SETS_DIR = os.path.join(AKITA_REPO, "evaluation/benchmarking/test_sets")
+MODELS_DIR = os.path.join(AKITA_REPO, "models/finetuned")
+
+sys.path.append(AKITA_REPO)
+from utils.data_utils import one_hot_encode_sequence, process_hic_matrix, upper_triangular_to_vector
+
 
 def run_benchmark(args: argparse.Namespace) -> None:
-    # ── Resolve paths ─────────────────────────────────────────────────────────
-    overlap_table = os.path.join(TEST_SETS_DIR, f"benchmark_test_set_{args.organism}.tsv")
-    print(f"Organism       : {args.organism}")
-    print(f"Ontology ID    : {args.ontology_id}")
-    print(f"Overlap table  : {overlap_table}")
+    # ── Import model class from the Akita repository ──────────────────────────
+    sys.path.append(AKITA_REPO)
+    from akita_model.model import SeqNN  # noqa: F401 (dynamic import)
 
-    ag_organism = _ORGANISM_MAP[args.organism]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
+    # ── Resolve paths from organism / dataset ─────────────────────────────────
+    overlap_table = os.path.join(TEST_SETS_DIR, f"benchmark_test_set_{args.organism}.tsv")
+    model_dir = os.path.join(MODELS_DIR, args.organism, args.dataset, "checkpoints")
+    model_prefix = f"Akita_v2_{args.organism}_{args.dataset}"
+
+    print(f"Organism       : {args.organism}")
+    print(f"Dataset        : {args.dataset}")
+    print(f"Overlap table  : {overlap_table}")
+    print(f"Model dir      : {model_dir}")
 
     # ── Load static data ──────────────────────────────────────────────────────
     overlap_df = pd.read_csv(overlap_table, sep="\t")
-
-    # Pre-compute cropped coordinates if not already present
-    if "cropped_start" not in overlap_df.columns:
-        overlap_df["cropped_start"] = overlap_df["start"] + CROP_BINS * BIN_SIZE
-        overlap_df["cropped_end"] = overlap_df["end"] - CROP_BINS * BIN_SIZE
-
     genome = Fasta(args.fasta)
     hic = cooler.Cooler(args.cool)
 
@@ -84,51 +67,48 @@ def run_benchmark(args: argparse.Namespace) -> None:
             names=["chr", "start", "end", "fold"],
         )
 
-    # ── Iterate over folds / models ───────────────────────────────────────────
+    # ── Iterate over models ───────────────────────────────────────────────────
     all_preds, all_targets = [], []
 
     for model_idx in range(args.n_models):
-        fold_version = _FOLD_VERSION_MAP[model_idx]
-        print(f"\n── Fold {model_idx}")
+        model_path = os.path.join(
+            model_dir,
+            f"{model_prefix}_model{model_idx}_finetuned.pth",
+        )
+        print(f"\n── Model {model_idx}: {model_path}")
 
-        dna_model = dna_client.create(args.api_key, model_version=fold_version)
+        model = SeqNN()
+        model.load_state_dict(torch.load(model_path, map_location=device))
+        model.to(device)
+        model.eval()
 
-        fold_df = overlap_df[overlap_df["type_alpha"] == f"fold{model_idx}"]
+        fold_df = overlap_df[overlap_df["type_akita"] == f"fold{model_idx}"]
 
         for i, row in enumerate(fold_df.itertuples(index=False)):
-            chrom = row.chr
-            start, end = row.start, row.end
-            cropped_start = row.cropped_start
-            cropped_end = row.cropped_end
+            chrom, start, end = row.chr, row.start, row.end
             region = f"{chrom}:{start}-{end}"
             print(f"  [{i}] {region}")
 
-            # Hi-C target matrix
+            # One-hot encode input sequence
+            ohe = one_hot_encode_sequence(genome[chrom][start:end])
+            ohe_tensor = torch.tensor(ohe, dtype=torch.float32)
+
+            # Process Hi-C target matrix
             hic_mat = process_hic_matrix(
                 hic,
                 region,
                 diagonal_offset=2,
                 padding=64,
                 kernel_stddev=1.0,
-                bin_size=BIN_SIZE,
+                bin_size=2048,
                 gaps_df=blacklist_df,
             )
 
             target_vec = upper_triangular_to_vector(hic_mat, dim=512, diag_offset=2)
 
-            # AlphaGenome prediction
-            sequence = genome[chrom][cropped_start:cropped_end].seq.upper()
-            output = dna_model.predict_sequence(
-                organism=ag_organism,
-                sequence=sequence,
-                requested_outputs=[dna_client.OutputType.CONTACT_MAPS],
-                ontology_terms=[args.ontology_id],
-            )
-
-            pred_mat = output.contact_maps.values[:, :, 0]
-            n = pred_mat.shape[0]
-            triu_idx = np.triu_indices(n, k=2)
-            pred_vec = pred_mat[triu_idx]
+            # Model prediction
+            with torch.no_grad():
+                pred_vec = model(ohe_tensor).squeeze().cpu().numpy()
 
             all_targets.append(target_vec)
             all_preds.append(pred_vec)
@@ -159,32 +139,28 @@ def run_benchmark(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Benchmark AlphaGenome: report Pearson R, Spearman R, and MSE.",
+        description="Benchmark an Akita model: report Pearson R, Spearman R, and MSE.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--organism",
         required=True,
         choices=["mouse", "human"],
-        help="Organism. Determines the test-set TSV and AlphaGenome organism enum.",
+        help="Organism. Determines the test-set TSV and model subdirectory.",
     )
     parser.add_argument(
-        "--ontology_id",
+        "--dataset",
         required=True,
-        help="Cell-type ontology ID passed to AlphaGenome, e.g. 'EFO:0004038'.",
+        help="Dataset name, e.g. 'Hsieh2019_mESC'. Used to locate models and build "
+        "the model prefix (<organism>/<dataset>/checkpoints/).",
     )
     parser.add_argument("--fasta", required=True, help="Genome FASTA file.")
     parser.add_argument("--cool", required=True, help="Hi-C .cool file.")
     parser.add_argument(
         "--n_models",
         type=int,
-        default=4,
-        help="Number of AlphaGenome fold models to evaluate (0 … n_models-1).",
-    )
-    parser.add_argument(
-        "--api_key",
-        default=os.environ.get("ALPHAGENOME_API_KEY", ""),
-        help="AlphaGenome API key. Defaults to $ALPHAGENOME_API_KEY env variable.",
+        default=8,
+        help="Number of cross-validation fold models (0 … n_models-1).",
     )
     parser.add_argument(
         "--blacklist",

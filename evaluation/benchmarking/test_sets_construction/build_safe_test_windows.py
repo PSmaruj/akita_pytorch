@@ -36,7 +36,7 @@ SPECIES_BED = {
 }
 
 # Default data root — override with --data_dir
-DEFAULT_DATA_DIR = Path("/home1/smaruj/pytorch_akita/benchmarking/test_sets")
+DEFAULT_DATA_DIR = Path("/home1/smaruj/pytorch_akita/evaluation/benchmarking/test_sets")
 
 
 # ---------------------------------------------------------------------------

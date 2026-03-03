@@ -55,56 +55,38 @@ pytest tests/ -v
 
 ```
 pytorch_akita/
-├── akita_model/                # Core model architecture
-│   ├── model.py                # Main Akita v2 model (clean implementation)
-│   ├── model_v2_compatible.py  # Compatible with old checkpoints
-│   └── modules.py              # Neural network building blocks
+├── 🧬 akita_model/           # Core architecture & neural building blocks
+│   ├── model.py              # Main Akita V2 implementation
+│   └── modules.py            # Custom layers and modules
 │
-├── benchmarking/               # Cross-model performance comparison
-│   ├── test_sets_construction/ # Scripts to find overlaps between Akita, AlphaGenome, & ORCA
-│   ├── test_sets/              # Human and Mouse test datasets (TSV format)
-│   └── evaluation/             # Scripts for running all models on the shared test sets
+├── 📊 data_processing/       # Hi-C data pipelines & preprocessing
+│   ├── dataset.py            # PyTorch Dataset for HiC data
+│   ├── create_cool_files.sh  # .pairs to .cool conversion
+│   ├── preprocessing_...     # Parallel processing scripts (.py/.sh)
+│   └── visualization_...     # Notebook for data sanity checks
 │
-├── data_processing/            # Data preprocessing utilities
-│   ├── dataset.py              # PyTorch Dataset for Hi-C data
-│   ├── preprocessing_data_parallel.py  # Parallel data preprocessing
-│   └── visualize_training_data.ipynb   # Data visualization notebook
+├── 🚀 workflows/             # Training, Finetuning, & Weights Transfer
+│   ├── training/             # Scripts & SLURM jobs for scratch training
+│   ├── finetuning/           # Pretrained model adaptation & loss analysis
+│   └── weight_transfer/      # TF-to-PyTorch conversion logic
 │
-├── training/                   # Training from scratch
-│   ├── training_utils.py       # Shared training utilities
-│   ├── train_model.py          # Training script
-│   └── train_model.sh          # SLURM job script
+├── 🧪 evaluation/            # The Performance Hub
+│   ├── internal/             # Notebooks/scripts for average model performance
+│   └── benchmarking/         # Cross-model evaluation (ORCA, AlphaGenome)
 │
-├── finetuning/                 # Fine-tuning pretrained models
-│   ├── finetune_model.py       # Fine-tuning script
-│   ├── finetune_model.sh       # SLURM job script
-│   └── analyze_finetuning_loss.ipynb  # Loss analysis notebook
+├── 📦 models/                # Weights & Checkpoints
+│   ├── finetuned/            # Recommended production models
+│   ├── tf_transferred/       # Original TF weights ported to Torch
+│   └── trained_from_scratch/ # Weights from native Torch training
 │
-├── evaluation/                 # Model evaluation
-│   └── evaluate_model.ipynb    # Evaluation and visualization notebook
+├── 🛠️ utils/                 # Shared helper functions
+│   ├── analysis_utils.py     # Metrics and stats
+│   ├── data_utils.py         # I/O helpers
+│   └── visualization_utils.py # Contact map plotting functions
 │
-├── weight_transfer/            # TensorFlow to PyTorch conversion
-│   └── transfer_tf_to_torch.py # Weight transfer script
-│
-├── utils/                      # Shared utility functions
-│   ├── visualization_utils.py  # Plotting and visualization
-│   └── analysis_utils.py       # Loss analysis and metrics
-│
-├── tests/                      # Unit tests
-│   └── test_utils.py           # Tests for critical functions
-│
-├── models/                     # Pretrained and fine-tuned models
-│   ├── tf_transferred/         # Models transferred from TensorFlow
-│   │   ├── human_models/
-│   │   └── mouse_models/
-│   └── finetuned/              # Fine-tuned models (recommended)
-│       ├── human_models/
-│       └── mouse_models/
-│
-├── environment.yml             # Conda environment file
-├── requirements.txt            # pip requirements file
-├── README.md                   # This file
-└── LICENSE                     # MIT License
+├── 📋 tests/                 # Unit tests for critical functions
+├── 🖼️ plots/                 # Figures for the paper
+└── 📄 Config & Meta          # environment.yml, requirements.txt, LICENSE
 ```
 
 ## Available Models
@@ -165,10 +147,10 @@ print(f"Prediction shape: {prediction.shape}")
 
 ### Fine-tuning on Your Own Data
 
-See `finetuning/finetune_model.py` and `finetuning/finetune_model.sh` for examples of fine-tuning the model on your own Hi-C datasets.
+See `workflows/finetuning/finetune_model.py` and `workflows/finetuning/finetune_model.sh` for examples of fine-tuning the model on your own Hi-C datasets.
 
 ```bash
-python finetuning/finetune_model.py \
+python workflows/finetuning/finetune_model.py \
     --data_dir /path/to/data \
     --test_fold fold0 \
     --val_fold fold1 \
@@ -201,8 +183,8 @@ See the scripts for detailed configuration options.
 Use the provided Jupyter notebooks for evaluation and visualization:
 
 - **`data_processing/visualize_training_data.ipynb`**: Visualize training data quality
-- **`finetuning/analyze_finetuning_loss.ipynb`**: Analyze training/validation loss curves
-- **`evaluation/evaluate_model.ipynb`**: Evaluate model performance and visualize predictions
+- **`workflows/finetuning/analyze_finetuning_loss.ipynb`**: Analyze training/validation loss curves
+- **`evaluation/internal/evaluate_model.ipynb`**: Evaluate model performance and visualize predictions
 
 ## Testing
 
