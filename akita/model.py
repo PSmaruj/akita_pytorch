@@ -7,7 +7,7 @@ which predicts Hi-C contact matrices from DNA sequences.
 
 import torch.nn as nn
 
-from akita_model.modules import (
+from akita.modules import (
     Conv2DBlock,
     ConvBlock,
     ConvBlockReduce,

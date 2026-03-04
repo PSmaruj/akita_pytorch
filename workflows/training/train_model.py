@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from akita_model.model import SeqNN
+from akita.model import SeqNN
 from data_preprocessing.dataset import HiCDataset
 from training.training_utils import compute_initial_losses, train_epoch, validate
 

@@ -38,7 +38,7 @@ from utils.data_utils import one_hot_encode_sequence, process_hic_matrix, upper_
 def run_benchmark(args: argparse.Namespace) -> None:
     # ── Import model class from the Akita repository ──────────────────────────
     sys.path.append(AKITA_REPO)
-    from akita_model.model import SeqNN  # noqa: F401 (dynamic import)
+    from akita.model import SeqNN  # noqa: F401 (dynamic import)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
