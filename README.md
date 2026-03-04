@@ -10,7 +10,7 @@ This repository provides a PyTorch version of the [AkitaV2 model](https://journa
 
 The models in this repository were transferred from the original TensorFlow implementation to PyTorch. The TensorFlow AkitaV2 model was trained jointly on both mouse and human data. Our transferred PyTorch models are introduced in this preprint [PLACEHOLDER FOR LINK].
 
-**Important Note on Performance**: The PyTorch implementation showed a minor performance reduction relative to the TensorFlow model, likely due to small numerical and implementation differences between frameworks (similar issues were reported in the [Basenji2 PyTorch port](https://github.com/d-laub/basenji2-pytorch/tree/main)). To mitigate this effect, each PyTorch model was fine-tuned from the transferred TensorFlow weights for the corresponding cell type. As a result, we provide separate fine-tuned models for each cell type/dataset.
+**Motivation for fine-tuning**: The PyTorch implementation showed a minor performance reduction relative to the TensorFlow model after directly transferring weights, likely due to small numerical and implementation differences between frameworks (similar issues were reported in the [Basenji2 PyTorch port](https://github.com/d-laub/basenji2-pytorch/tree/main)). To mitigate this effect, each PyTorch model was fine-tuned from the transferred TensorFlow weights for the corresponding cell type. As a result, we provide separate fine-tuned models for each cell type/dataset.
 
 ## Installation
 
