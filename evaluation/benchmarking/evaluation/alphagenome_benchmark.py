@@ -29,7 +29,9 @@ from scipy.stats import pearsonr, spearmanr
 # ──────────────────────────────────────────────────────────────────────────────
 
 AKITA_REPO = "/home1/smaruj/pytorch_akita"
-TEST_SETS_DIR = os.path.join(AKITA_REPO, "/evaluation/benchmarking/test_sets")
+TEST_SETS_DIR = os.path.join(AKITA_REPO, "evaluation/benchmarking/test_sets")
+
+print("TEST_SETS_DIR", TEST_SETS_DIR)
 
 sys.path.append(AKITA_REPO)
 from utils.data_utils import process_hic_matrix, upper_triangular_to_vector

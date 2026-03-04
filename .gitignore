@@ -3,6 +3,7 @@ __pycache__/
 akita_model/__pycache__/
 data_preprocessing/__pycache__/
 training/__pycache__/
+utils/__pycache__/
 
 # Jupyter notebooks checkpoints
 .ipynb_checkpoints/
