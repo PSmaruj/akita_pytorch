@@ -17,13 +17,11 @@ The models in this repository were transferred from the original TensorFlow impl
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/PSmaruj/pytorch_akita.git
-cd pytorch_akita
+git clone https://github.com/PSmaruj/akita_pytorch.git
+cd akita_pytorch
 ```
 
 ### 2. Set Up Environment
-
-#### Option A: Using Conda
 
 ```bash
 # Create conda environment
@@ -31,17 +29,6 @@ conda env create -f environment.yml
 
 # Activate environment
 conda activate pytorch_akita
-```
-
-#### Option B: Using pip
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate]
-
-# Install dependencies
-pip install -r requirements.txt
 ```
 
 ### 3. Verify Installation
@@ -54,7 +41,7 @@ pytest tests/ -v
 ## Repository Structure
 
 ```
-pytorch_akita/
+akita_pytorch/
 ├── 🧬 akita_model/           # Core architecture & neural building blocks
 │   ├── model.py              # Main Akita V2 implementation
 │   └── modules.py            # Custom layers and modules
@@ -226,7 +213,7 @@ For major changes, please open an issue first to discuss what you would like to 
 
 ### Reporting Issues
 
-If you encounter any bugs or have feature requests, please [open an issue](https://github.com/yourusername/pytorch_akita/issues) with:
+If you encounter any bugs or have feature requests, please [open an issue](https://github.com/yourusername/akita_pytorch/issues) with:
 - A clear description of the problem
 - Steps to reproduce
 - Expected vs actual behavior
