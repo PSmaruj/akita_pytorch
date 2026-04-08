@@ -1,0 +1,87 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "akita_pytorch"
+version = "0.1.0"
+description = "PyTorch implementation of the AkitaV2 deep learning model for predicting Hi-C contact matrices from DNA sequence"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Paulina Smaruj", email = "smaruj@usc.edu" },
+    { name = "Geoffrey Fudenberg", email = "fudenber@usc.edu" },
+]
+requires-python = ">=3.10"
+keywords = [
+    "genomics",
+    "deep-learning",
+    "hi-c",
+    "3d-genome",
+    "chromatin",
+    "sequence-model",
+    "pytorch",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "numpy>=1.24.0,<2.0.0",
+    "pandas>=2.0.0",
+    "scipy>=1.10.0",
+    "pyfaidx>=0.9.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.13.0",
+    "scikit-learn>=1.3.0",
+    "h5py>=3.8.0",
+]
+
+[project.optional-dependencies]
+# Hi-C data processing dependencies (needed for data_processing/ workflows)
+hic = [
+    "cooler>=0.10.0",
+    "cooltools>=0.7.0",
+    "bioframe>=0.8.0",
+    "pairtools>=1.0.0",
+    "pysam>=0.20.0",
+    "astropy>=6.0.0",
+]
+# Development and testing
+dev = [
+    "pytest>=7.3.0",
+    "pytest-cov>=4.0.0",
+]
+# Jupyter notebooks
+notebooks = [
+    "jupyter>=1.0.0",
+    "ipykernel>=6.22.0",
+    "jupyterlab>=4.0.0",
+]
+# Everything
+all = [
+    "akita-pytorch[hic,dev,notebooks]",
+]
+
+[project.urls]
+Homepage = "https://github.com/PSmaruj/akita_pytorch"
+"Bug Tracker" = "https://github.com/PSmaruj/akita_pytorch/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["akita_model*", "utils*"]
+exclude = [
+    "tests*",
+    "workflows*",
+    "evaluation*",
+    "data_processing*",
+    "models*",
+    "plots*",
+]

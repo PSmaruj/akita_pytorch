@@ -14,27 +14,36 @@ The models in this repository were transferred from the original TensorFlow impl
 
 ## Installation
 
-### 1. Clone the Repository
+### Option A — pip (recommended for most users)
+
+If you only need to load and run the model (e.g. for use with
+[AkitaSF](https://github.com/PSmaruj/akita_semifreddo)):
 
 ```bash
-git clone https://github.com/PSmaruj/akita_pytorch.git
-cd akita_pytorch
+pip install akita-pytorch
 ```
 
-### 2. Set Up Environment
+To also install the Hi-C data processing dependencies (cooler, cooltools, pairtools, etc.):
 
 ```bash
-# Create conda environment
-conda env create -f environment.yml
+pip install akita-pytorch[hic]
+```
 
-# Activate environment
+### Option B — conda (recommended for development or data preprocessing)
+
+```bash
+# Clone the repository
+git clone https://github.com/PSmaruj/akita_pytorch.git
+cd akita_pytorch
+
+# Create and activate the conda environment
+conda env create -f environment.yml
 conda activate pytorch_akita
 ```
 
-### 3. Verify Installation
+### Verify Installation
 
 ```bash
-# Run tests to verify installation
 pytest tests/ -v
 ```
 
