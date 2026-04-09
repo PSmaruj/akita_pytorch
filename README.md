@@ -20,13 +20,7 @@ If you only need to load and run the model (e.g. for use with
 [AkitaSF](https://github.com/PSmaruj/akita_semifreddo)):
 
 ```bash
-pip install akita-pytorch
-```
-
-To also install the Hi-C data processing dependencies (cooler, cooltools, pairtools, etc.):
-
-```bash
-pip install akita-pytorch[hic]
+pip install git+https://github.com/PSmaruj/akita_pytorch.git
 ```
 
 ### Option B — conda (recommended for development or data preprocessing)
