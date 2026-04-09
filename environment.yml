@@ -10,9 +10,12 @@ dependencies:
   - python=3.10
 
   # Deep Learning
+  # Uncomment ONE of the following lines depending on your hardware:
   - pytorch>=2.0.0
   - torchvision>=0.15.0
-  - pytorch-cuda=11.8  # Adjust based on your CUDA version, or use cpuonly
+  - cpuonly                  # CPU only (Mac, no GPU)
+  # - pytorch-cuda=11.8     # NVIDIA GPU with CUDA 11.8
+  # - pytorch-cuda=12.1     # NVIDIA GPU with CUDA 12.1
 
   # Core Scientific Computing
   - numpy>=1.24.0,<2.0.0
@@ -51,4 +54,4 @@ dependencies:
   - pip:
     - schedulefree
     - fvcore
-    - pairtools  # If not available in conda
+    - pairtools
