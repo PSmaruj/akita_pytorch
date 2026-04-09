@@ -76,12 +76,12 @@ Homepage = "https://github.com/PSmaruj/akita_pytorch"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["akita_model*", "utils*"]
+include = ["akita*", "utils*"]
 exclude = [
     "tests*",
     "workflows*",
     "evaluation*",
-    "data_processing*",
+    "data_preprocessing*",
     "models*",
     "plots*",
 ]
