@@ -16,14 +16,18 @@ The models in this repository were transferred from the original TensorFlow impl
 
 ### Option A — pip (recommended for most users)
 
-If you only need to load and run the model (e.g. for use with
-[AkitaSF](https://github.com/PSmaruj/akita_semifreddo)):
+If you only want to use the model class to train on your own data:
 
 ```bash
 pip install git+https://github.com/PSmaruj/akita_pytorch.git
 ```
 
-### Option B — conda (recommended for development or data preprocessing)
+> **Note:** The pip installation includes the model class and training code,
+> but **not the model weights**. If you plan to run inference or use AkitaSF,
+> you will need the pretrained checkpoints — please clone the repository
+> (Option B) to access them.
+
+### Option B — clone (required for accessing model weights)
 
 ```bash
 # Clone the repository
