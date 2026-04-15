@@ -16,7 +16,7 @@ The models in this repository were transferred from the original TensorFlow impl
 
 ### Option A — pip (recommended for most users)
 
-If you only want to use the model class to train on your own data:
+If you want to use the model class to train on your own data:
 
 ```bash
 pip install git+https://github.com/PSmaruj/akita_pytorch.git
@@ -24,10 +24,9 @@ pip install git+https://github.com/PSmaruj/akita_pytorch.git
 
 > **Note:** The pip installation includes the model class and training code,
 > but **not the model weights**. If you plan to run inference or use AkitaSF,
-> you will need the pretrained checkpoints — please clone the repository
-> (Option B) to access them.
+> you will need the pretrained checkpoints — see [Downloading Model Weights](#downloading-model-weights) below.
 
-### Option B — clone (required for accessing model weights)
+### Option B — clone (required for running workflows)
 
 ```bash
 # Clone the repository
@@ -68,11 +67,6 @@ akita_pytorch/
 │   ├── internal/             # Notebooks/scripts for average model performance
 │   └── benchmarking/         # Cross-model evaluation (ORCA, AlphaGenome)
 │
-├── 📦 models/                # Weights & Checkpoints
-│   ├── finetuned/            # Recommended production models
-│   ├── tf_transferred/       # Original TF weights ported to Torch
-│   └── trained_from_scratch/ # Weights from native Torch training
-│
 ├── 🛠️ utils/                 # Shared helper functions
 │   ├── analysis_utils.py     # Metrics and stats
 │   ├── data_utils.py         # I/O helpers
@@ -83,55 +77,52 @@ akita_pytorch/
 └── 📄 Config & Meta          # environment.yml, requirements.txt, LICENSE
 ```
 
-## Available Models
+## Downloading Model Weights
 
-Pytorch-Akita models are available in the `models/` directory:
+Model weights are hosted on Zenodo: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19599537.svg)](https://doi.org/10.5281/zenodo.19599537)
 
-- **`models/pretrained/`**: Models with weights transferred from TensorFlow
-- **`models/finetuned/`**: Fine-tuned models for specific cell types
-- **`models/trained_from_scratch/`**: Model trained from scratch on B-cell data
+Two sets of weights are available:
 
-### Organisms and Cell Types
+- **`finetuned/`** — Recommended for inference; fine-tuned per cell type/dataset
+- **`trained_from_scratch/`** — Weights from native PyTorch training on B-cell data
 
-Information on datasets used for training can be found in the supporting information table in the Akita v2 paper: [PLOS Computational Biology Supporting Information](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1012824#sec030).
+To download and extract all weights, run from the root of the repository:
 
-**Mouse B cell data**: We collected Hi-C data from B cells via the [4DN data portal](https://data.4dnucleome.org/) ([Vian et al., 2018](https://www.sciencedirect.com/science/article/pii/S0092867418304045)), specifically the paired files `4DNFI27I3P1V` and `4DNFIFBBAKK4`, which were concatenated to increase coverage.
+```bash
+wget -O akita_pytorch_model_weights.tar.gz https://zenodo.org/record/19599537/files/akita_pytorch_model_weights.tar.gz
+tar -xzf akita_pytorch_model_weights.tar.gz && rm akita_pytorch_model_weights.tar.gz
+```
 
-## Usage
+This will recreate the `models/` directory with the original structure:
 
-### Loading a Pretrained Model
+```
+models/
+├── finetuned/
+│   ├── mouse/
+│   │   └── <dataset>/checkpoints/*.pth
+│   └── human/
+│       └── <dataset>/checkpoints/*.pth
+└── trained_from_scratch/
+```
+
+## Making Predictions
 
 ```python
 import torch
 from akita_model.model import SeqNN
 
-# Load a fine-tuned model
+# Load a fine-tuned model (after downloading the models)
 model_path = "models/finetuned/mouse/Hsieh2019_mESC/checkpoints/Akita_v2_mouse_Hsieh2019_mESC_model0_finetuned.pth"
 
-# Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = torch.load(model_path, map_location=device, weights_only=False)
 model.eval()
 
-print("Model loaded successfully!")
-```
-
-### Making Predictions
-
-```python
-import torch
-import numpy as np
-
 # Prepare input: one-hot encoded DNA sequence
-# Shape: (batch_size, 4, 1310720)
-# Channels: [A, C, G, T]
+# Shape: (batch_size, 4, 1310720) — channels: [A, C, G, T]
 sequence = torch.randn(1, 4, 1310720)  # Replace with actual one-hot encoded sequence
-
-# Move to device
 sequence = sequence.to(device)
-model = model.to(device)
 
-# Make prediction
 with torch.no_grad():
     prediction = model(sequence)
 
@@ -139,7 +130,7 @@ with torch.no_grad():
 print(f"Prediction shape: {prediction.shape}")
 ```
 
-### Fine-tuning on Your Own Data
+## Fine-tuning on Your Own Data
 
 See `workflows/finetuning/finetune_model.py` and `workflows/finetuning/finetune_model.sh` for examples of fine-tuning the model on your own Hi-C datasets.
 
@@ -185,7 +176,6 @@ Use the provided Jupyter notebooks for evaluation and visualization:
 Run the test suite to verify correctness of critical functions:
 
 ```bash
-# Run all tests
 pytest tests/ -v
 ```
 
@@ -220,7 +210,7 @@ For major changes, please open an issue first to discuss what you would like to 
 
 ### Reporting Issues
 
-If you encounter any bugs or have feature requests, please [open an issue](https://github.com/yourusername/akita_pytorch/issues) with:
+If you encounter any bugs or have feature requests, please [open an issue](https://github.com/PSmaruj/akita_pytorch/issues) with:
 - A clear description of the problem
 - Steps to reproduce
 - Expected vs actual behavior
@@ -247,4 +237,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Last Updated**: February 2026
+**Last Updated**: April 2026
