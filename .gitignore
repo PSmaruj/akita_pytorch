@@ -12,3 +12,4 @@ utils/__pycache__/
 .pytest_cache/
 *.logmodels/
 akita_pytorch_model_weights.tar.gz
+models/
