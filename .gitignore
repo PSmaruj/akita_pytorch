@@ -10,4 +10,5 @@ utils/__pycache__/
 
 *.egg-info/
 .pytest_cache/
-*.log
+*.logmodels/
+akita_pytorch_model_weights.tar.gz
