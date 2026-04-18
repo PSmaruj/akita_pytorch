@@ -6,8 +6,9 @@ Usage:
     python akita_benchmark.py \
         --organism mouse \
         --dataset Hsieh2019_mESC \
-        --fasta /project2/fudenber_735/genomes/mm10/mm10.fa \
-        --cool /project2/fudenber_735/GEO/Hsieh2019/4DN/mESC_mm10_4DNFILZ1CPT8.mapq_30.2048.cool \
+        --fasta /path/to/mm10.fa \
+        --cool /path/to/hic_data.mapq_30.2048.cool \
+        --models_dir /path/to/models/finetuned \
         --n_models 8 \
         --blacklist /path/to/blacklist.bed
 """
@@ -27,11 +28,12 @@ from scipy.stats import pearsonr, spearmanr
 # Main benchmarking routine
 # ──────────────────────────────────────────────────────────────────────────────
 
-AKITA_REPO = "/home1/smaruj/pytorch_akita"
+AKITA_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST_SETS_DIR = os.path.join(AKITA_REPO, "evaluation/benchmarking/test_sets")
-MODELS_DIR = os.path.join(AKITA_REPO, "models/finetuned")
+# MODELS_DIR is passed as --models_dir argument (weights are hosted on Zenodo:
+# https://doi.org/10.5281/zenodo.19599537)
 
-sys.path.append(AKITA_REPO)
+
 from utils.data_utils import one_hot_encode_sequence, process_hic_matrix, upper_triangular_to_vector
 
 

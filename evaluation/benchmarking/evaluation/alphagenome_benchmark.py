@@ -28,12 +28,9 @@ from scipy.stats import pearsonr, spearmanr
 # Constants
 # ──────────────────────────────────────────────────────────────────────────────
 
-AKITA_REPO = "/home1/smaruj/pytorch_akita"
+AKITA_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST_SETS_DIR = os.path.join(AKITA_REPO, "evaluation/benchmarking/test_sets")
 
-print("TEST_SETS_DIR", TEST_SETS_DIR)
-
-sys.path.append(AKITA_REPO)
 from utils.data_utils import process_hic_matrix, upper_triangular_to_vector
 
 CROP_BINS = 64  # bins to crop from each side (shared with Akita padding)

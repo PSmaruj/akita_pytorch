@@ -23,9 +23,6 @@ import pandas as pd
 import torch
 from pyfaidx import Fasta
 
-AKITA_REPO = "/home1/smaruj/pytorch_akita"
-
-sys.path.append(AKITA_REPO)
 from utils.data_utils import one_hot_encode_sequence, process_hic_matrix, upper_triangular_to_vector
 
 # =============================================================================

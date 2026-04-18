@@ -33,7 +33,7 @@
 #------------------------------------------------------------------------------
 # Activate conda environment with cooler and pairtools
 eval "$(conda shell.bash hook)"
-conda activate pytorch_hic
+conda activate pytorch_akita
 
 #------------------------------------------------------------------------------
 # Configuration - MODIFY THESE PATHS FOR YOUR DATA
@@ -41,17 +41,17 @@ conda activate pytorch_hic
 
 # Genome assembly and chromosome sizes
 ASSEMBLY="mm10"
-CHROMSIZES="/project2/fudenber_735/genomes/mm10/mm10.chrom.sizes.reduced"
+CHROMSIZES="/path/to/mm10.chrom.sizes.reduced"   # path to your chrom.sizes file
 
 # For human data, uncomment these lines:
 # ASSEMBLY="hg38"
-# CHROMSIZES="/project2/fudenber_735/genomes/hg38/hg38.chrom.sizes.reduced"
+# CHROMSIZES="/path/to/hg38.chrom.sizes.reduced"
 
 # Resolution settings
 BIN_SIZE=512                            # Base resolution in bp
 
 # Data paths
-DATA_DIR="/scratch1/smaruj/Akita_pytorch_training_data/mouse_unprocessed_data/Vian2018_Bcells"
+DATA_DIR="/path/to/your/pairs/files"    # directory containing your .pairs.gz files
 
 # Input pairs files (can specify multiple files for merging)
 PAIRS1="4DNFI27I3P1V.pairs.gz"

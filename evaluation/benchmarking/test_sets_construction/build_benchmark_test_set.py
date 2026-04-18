@@ -49,12 +49,11 @@ MOUSE_SAMPLE_N = 500
 MOUSE_SAMPLE_SEED = 42
 
 AKITA_BED = {
-    "human": "/project2/fudenber_735/tensorflow_models/akita/v2/data/hg38/sequences.bed",
-    "mouse": "/project2/fudenber_735/tensorflow_models/akita/v2/data/mm10/sequences.bed",
+    "human": "/path/to/hg38/sequences.bed",   # Akita V2 hg38 sequences BED file
+    "mouse": "/path/to/mm10/sequences.bed",   # Akita V2 mm10 sequences BED file
 }
 
-DEFAULT_DATA_ROOT = Path("/home1/smaruj/pytorch_akita/evaluation/benchmarking/test_sets")
-
+DEFAULT_DATA_ROOT = Path(__file__).resolve().parents[1] / "test_sets"
 
 # ---------------------------------------------------------------------------
 # Core logic

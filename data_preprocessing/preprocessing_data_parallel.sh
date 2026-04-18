@@ -40,7 +40,7 @@ echo ""
 
 # Activate conda environment
 eval "$(conda shell.bash hook)"
-conda activate pytorch_hic
+conda activate pytorch_akita
 
 #------------------------------------------------------------------------------
 # Configuration - MODIFY THESE PATHS FOR YOUR DATA
@@ -50,10 +50,10 @@ conda activate pytorch_hic
 SPECIES="human"
 
 # Hi-C data
-COOL_FILE="/project2/fudenber_735/smaruj/sequence_design/ledidi_semifreddo_akita/Akita_pytorch_training_data/human_cool_files/Krietenstein2019_HFF/HiC_Krietenstein2019_HFF.hg38.mapq30.2048.cool"
+COOL_FILE="/path/to/your/hic_data.2048.cool"   # path to your 2048bp .cool file
 
 # Output directory for processed .pt files
-OUTPUT_DIR="/project2/fudenber_735/smaruj/sequence_design/ledidi_semifreddo_akita/Akita_pytorch_training_data/human_training_data/Krietenstein2019_HFF"
+OUTPUT_DIR="/path/to/your/output_directory"     # directory where .pt files will be saved
 
 # Parallel processing settings
 NUM_WORKERS=64                         # Should match or be less than --cpus-per-task
@@ -69,16 +69,16 @@ LOG_LEVEL="INFO"
 
 if [ "$SPECIES" = "mouse" ]; then
     echo "Species: Mouse (mm10)"
-    FASTA_FILE="/project2/fudenber_735/genomes/mm10/mm10.fa"
-    BED_FILE="/project2/fudenber_735/tensorflow_models/akita/v2/data/mm10/sequences.bed"
-    GAPS_FILE="/project2/fudenber_735/backup/DNN_HiC/data_mm10/mm10.blacklist.rep.bed"
-    
+    FASTA_FILE="/path/to/mm10.fa"                      # mm10 reference genome FASTA
+    BED_FILE="/path/to/mm10/sequences.bed"             # Akita V2 mm10 sequences BED file
+    GAPS_FILE="/path/to/mm10.blacklist.rep.bed"        # mm10 blacklist/gap regions
+
 elif [ "$SPECIES" = "human" ]; then
     echo "Species: Human (hg38)"
-    FASTA_FILE="/project2/fudenber_735/genomes/hg38/hg38.fa"
-    BED_FILE="/project2/fudenber_735/tensorflow_models/akita/v2/data/hg38/sequences.bed"
-    GAPS_FILE="/project2/fudenber_735/backup/DNN_HiC/data_hg38/hg38.blacklist.rep.bed"
-    
+    FASTA_FILE="/path/to/hg38.fa"                      # hg38 reference genome FASTA
+    BED_FILE="/path/to/hg38/sequences.bed"             # Akita V2 hg38 sequences BED file
+    GAPS_FILE="/path/to/hg38.blacklist.rep.bed"        # hg38 blacklist/gap regions
+
 else
     echo "Error: SPECIES must be 'mouse' or 'human'"
     exit 1
@@ -180,4 +180,3 @@ echo "End time: $(date)"
 echo "=========================================="
 
 exit $EXIT_CODE
-  

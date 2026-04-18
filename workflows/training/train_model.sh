@@ -38,7 +38,7 @@ echo ""
 
 # Activate conda environment
 eval "$(conda shell.bash hook)"
-conda activate pytorch_hic
+conda activate pytorch_akita
 
 # Verify GPU availability
 if command -v nvidia-smi &> /dev/null; then
@@ -52,7 +52,7 @@ fi
 #------------------------------------------------------------------------------
 
 # Dataset configuration
-DATA_DIR="/scratch1/smaruj/Akita_pytorch_training_data/mouse_data/Vian2018_Bcells"
+DATA_DIR="/path/to/your/training_data/Vian2018_Bcells"  # directory containing processed .pt files
 DATASET_NAME="Vian2018_Bcells"
 ORGANISM="mouse"                      # mouse or human
 MODEL_IDX=0                           # Model/fold index
@@ -73,7 +73,7 @@ EARLY_STOP_PATIENCE=50                # Early stopping patience (epochs)
 LOG_INTERVAL=200                      # Logging interval (batches)
 
 # Output paths
-OUTPUT_BASE="/scratch1/smaruj/Akita_pytorch_models/trained_from_scratch/${ORGANISM}_models/${DATASET_NAME}"
+OUTPUT_BASE="/path/to/your/output/trained_from_scratch/${ORGANISM}_models/${DATASET_NAME}"
 SAVE_MODEL_PATH="${OUTPUT_BASE}/models/Akita_v2_${ORGANISM}_${DATASET_NAME}_model${MODEL_IDX}_from_scratch.pth"
 SAVE_LOSSES_PATH="${OUTPUT_BASE}/losses/Akita_v2_${ORGANISM}_${DATASET_NAME}_model${MODEL_IDX}_from_scratch.csv"
 

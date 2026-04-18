@@ -11,9 +11,6 @@ import numpy as np
 import pytest
 import torch
 
-# Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from training.training_utils import compute_loss
 from utils.visualization_utils import set_diag, upper_triu_to_matrix
 

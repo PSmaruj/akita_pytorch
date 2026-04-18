@@ -1,3 +1,4 @@
+
 """
 ORCA Model Benchmarking Script
 Evaluates ORCA model accuracy (Pearson R, Spearman R, MSE) on a given species/cell type.
@@ -16,6 +17,7 @@ Usage:
         --model_class H1esc_1M \
         --fasta /path/to/genome.fa \
         --cool /path/to/hic.cool \
+        --orca_repo /path/to/orca \
         --blacklist /path/to/blacklist.bed
 """
 
@@ -35,11 +37,10 @@ from scipy.stats import pearsonr, spearmanr
 # Constants
 # ──────────────────────────────────────────────────────────────────────────────
 
-AKITA_REPO = "/home1/smaruj/pytorch_akita"
-ORCA_REPO = "/home1/smaruj/orca"
+AKITA_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST_SETS_DIR = os.path.join(AKITA_REPO, "evaluation/benchmarking/test_sets")
+# ORCA_REPO is passed as --orca_repo argument (path to the cloned ORCA repository)
 
-sys.path.append(AKITA_REPO)
 from utils.data_utils import one_hot_encode_sequence, process_hic_matrix, upper_triangular_to_vector
 
 AKITA_LENGTH = 1_310_720  # input length of the Akita test windows

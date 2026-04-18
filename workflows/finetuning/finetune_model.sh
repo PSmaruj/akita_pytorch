@@ -39,7 +39,7 @@ echo ""
 
 # Activate conda environment
 eval "$(conda shell.bash hook)"
-conda activate pytorch_hic
+conda activate pytorch_akita
 
 # Verify GPU availability
 if command -v nvidia-smi &> /dev/null; then
@@ -53,7 +53,7 @@ fi
 #------------------------------------------------------------------------------
 
 # Dataset configuration
-DATA_DIR="/scratch1/smaruj/Akita_pytorch_training_data/mouse_data/Bonev2017_NPC"
+DATA_DIR="/path/to/your/training_data/Bonev2017_NPC"  # directory containing processed .pt files
 DATA_NAME="Bonev2017_NPC"
 ORGANISM="mouse"                      # mouse or human
 DATA_SPLIT=0                          # Model/fold index
@@ -154,9 +154,9 @@ echo "=========================================="
 if [ $EXIT_CODE -eq 0 ]; then
     echo "✓ Fine-tuning completed successfully!"
     echo ""
-    echo "Output files:"
-    echo "  Model checkpoint: /scratch1/smaruj/Akita_pytorch_models/finetuned/${ORGANISM}_models/${DATA_NAME}/models/"
-    echo "  Loss history:     /scratch1/smaruj/Akita_pytorch_models/finetuned/${ORGANISM}_models/${DATA_NAME}/losses/"
+    echo "Output files saved to the directory specified in finetune_model.py:"
+    echo "  - Model checkpoints: .../finetuned/${ORGANISM}_models/${DATA_NAME}/models/"
+    echo "  - Loss history:      .../finetuned/${ORGANISM}_models/${DATA_NAME}/losses/"
     echo ""
     echo "Next steps:"
     echo "  1. Check loss curves: analyze_finetuning_loss.ipynb"

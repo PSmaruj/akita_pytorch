@@ -17,9 +17,6 @@ import sys
 import h5py
 import torch
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from akita.model import SeqNN
 
 # =============================================================================

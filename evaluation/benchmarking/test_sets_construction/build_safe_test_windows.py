@@ -31,12 +31,12 @@ N_FOLDS = 4
 FOLDS = [f"fold{i}" for i in range(N_FOLDS)]
 
 SPECIES_BED = {
-    "human": "/project2/fudenber_735/smaruj/sequence_design/ledidi_semifreddo_akita/pytorch_akita_benchmarking/sequences_human.bed.gz",
-    "mouse": "/project2/fudenber_735/smaruj/sequence_design/ledidi_semifreddo_akita/pytorch_akita_benchmarking/sequences_mouse.bed.gz",
+    "human": "/path/to/sequences_human.bed.gz",   # Akita V2 hg38 sequences BED file
+    "mouse": "/path/to/sequences_mouse.bed.gz",   # Akita V2 mm10 sequences BED file
 }
 
-# Default data root — override with --data_dir
-DEFAULT_DATA_DIR = Path("/home1/smaruj/pytorch_akita/evaluation/benchmarking/test_sets")
+# Default data root
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / "test_sets"
 
 
 # ---------------------------------------------------------------------------
