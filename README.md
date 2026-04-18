@@ -16,7 +16,7 @@ The models in this repository were transferred from the original TensorFlow impl
 
 ### Option A — pip (recommended for most users)
 
-If you want to use the model class to train on your own data:
+If you only want to use the model class to train on your own data:
 
 ```bash
 pip install git+https://github.com/PSmaruj/akita_pytorch.git
@@ -111,7 +111,7 @@ models/
 import torch
 from akita_model.model import SeqNN
 
-# Load a fine-tuned model (after downloading the models)
+# Load a fine-tuned model (after running download_models.sh)
 model_path = "models/finetuned/mouse/Hsieh2019_mESC/checkpoints/Akita_v2_mouse_Hsieh2019_mESC_model0_finetuned.pth"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
